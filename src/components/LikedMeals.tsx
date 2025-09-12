@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { ArrowLeft, Heart, ShoppingBag, DollarSign, Trash2, ChefHat, Clock, Users, X } from 'lucide-react'
 import { useLikedMeals } from '@/contexts/LikedMealsContext'
 import { FoodItem } from '@/types/food'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { getUserState, shouldShowLandingPage } from '@/lib/localStorage'
 
 interface LikedMealsProps {
@@ -14,37 +14,110 @@ interface LikedMealsProps {
   onStartOver: () => void
 }
 
-// Extended meal data with recipe info (normally would come from API)
-const getMealData = (meal: FoodItem) => ({
-  recipe: {
-    description: `A delicious ${meal.name} recipe that combines fresh ingredients with simple cooking techniques.`,
-    cookTime: Math.floor(Math.random() * 45) + 15,
-    servings: Math.floor(Math.random() * 4) + 2,
-    difficulty: ['Easy', 'Medium', 'Hard'][Math.floor(Math.random() * 3)] as 'Easy' | 'Medium' | 'Hard',
-    instructions: [
-      'Prepare all ingredients by washing and chopping as needed',
-      `Season the ${meal.name} with salt and pepper`,
-      'Heat oil in a large skillet over medium-high heat',
-      'Cook ingredients according to recipe specifications',
-      'Taste and adjust seasoning as needed',
-      'Serve hot and enjoy!'
-    ]
-  },
-  ingredients: [
-    { name: meal.name, amount: '1 lb', price: meal.price, category: meal.category || 'main' },
-    { name: 'Olive Oil', amount: '2 tbsp', price: 0.50, category: 'pantry' },
-    { name: 'Salt', amount: '1 tsp', price: 0.10, category: 'seasoning' },
-    { name: 'Black Pepper', amount: '1/2 tsp', price: 0.15, category: 'seasoning' },
-    { name: 'Garlic', amount: '3 cloves', price: 0.75, category: 'vegetable' },
-    { name: 'Onion', amount: '1 medium', price: 1.25, category: 'vegetable' }
-  ]
-})
+// Fetch real meal data from API
+const getMealData = async (meal: FoodItem) => {
+  try {
+    const recipeText = `Create a recipe using ${meal.name} as the main ingredient.`;
+    const requirements = `Budget-friendly ingredients from ${meal.shopName || 'local grocery stores'}. Include nutritious and accessible ingredients.`;
+
+    const response = await fetch('/api/chat/parse-recipe', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        recipe: recipeText,
+        requirements,
+        fields: ['productId', 'name', 'price', 'shop'],
+        limit: 5
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`API call failed: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    // Transform API response to match expected format
+    const ingredients = data.shopping_list?.map((item: {ingredient: string; chosen_product: {name: string; price: number} | null}) => ({
+      name: item.chosen_product?.name || item.ingredient,
+      amount: data.ingredients?.find((ing: {name: string; quantity: string}) => ing.name.toLowerCase().includes(item.ingredient.toLowerCase()))?.quantity || '1 unit',
+      price: item.chosen_product?.price || 0,
+      category: 'ingredient'
+    })) || [];
+
+    // Add the main meal item if not already included
+    const mainIngredientExists = ingredients.some((ing: {name: string}) => 
+      ing.name.toLowerCase().includes(meal.name.toLowerCase())
+    );
+    
+    if (!mainIngredientExists) {
+      ingredients.unshift({
+        name: meal.name,
+        amount: '1 lb',
+        price: meal.price,
+        category: meal.category || 'main'
+      });
+    }
+
+    return {
+      recipe: {
+        description: `A delicious recipe featuring ${meal.name} with fresh ingredients and simple cooking techniques.`,
+        cookTime: Math.floor(Math.random() * 45) + 15,
+        servings: Math.floor(Math.random() * 4) + 2,
+        difficulty: ['Easy', 'Medium', 'Hard'][Math.floor(Math.random() * 3)] as 'Easy' | 'Medium' | 'Hard',
+        instructions: [
+          'Prepare all ingredients by washing and chopping as needed',
+          `Season the ${meal.name} with salt and pepper to taste`,
+          'Heat oil in a large skillet over medium-high heat',
+          'Add ingredients according to cooking requirements',
+          'Cook until tender and flavors are well combined',
+          'Taste and adjust seasoning as needed',
+          'Serve hot and enjoy your delicious meal!'
+        ]
+      },
+      ingredients
+    };
+  } catch (error) {
+    console.error('Error fetching meal data:', error);
+    // Fallback to basic data structure if API call fails
+    return {
+      recipe: {
+        description: `A delicious ${meal.name} recipe that combines fresh ingredients with simple cooking techniques.`,
+        cookTime: Math.floor(Math.random() * 45) + 15,
+        servings: Math.floor(Math.random() * 4) + 2,
+        difficulty: ['Easy', 'Medium', 'Hard'][Math.floor(Math.random() * 3)] as 'Easy' | 'Medium' | 'Hard',
+        instructions: [
+          'Prepare all ingredients by washing and chopping as needed',
+          `Season the ${meal.name} with salt and pepper`,
+          'Heat oil in a large skillet over medium-high heat',
+          'Cook ingredients according to recipe specifications',
+          'Taste and adjust seasoning as needed',
+          'Serve hot and enjoy!'
+        ]
+      },
+      ingredients: [
+        { name: meal.name, amount: '1 lb', price: meal.price, category: meal.category || 'main' },
+        { name: 'Olive Oil', amount: '2 tbsp', price: 0.50, category: 'pantry' },
+        { name: 'Salt', amount: '1 tsp', price: 0.10, category: 'seasoning' },
+        { name: 'Black Pepper', amount: '1/2 tsp', price: 0.15, category: 'seasoning' }
+      ]
+    };
+  }
+}
+
+interface MealDataCache {
+  [key: string]: ReturnType<typeof getMealData> extends Promise<infer T> ? T : never
+}
 
 export default function LikedMeals({ onBack, onStartOver }: LikedMealsProps) {
   const { likedMeals, removeLikedMeal, clearLikedMeals } = useLikedMeals()
   const [selectedMeal, setSelectedMeal] = useState<FoodItem | null>(null)
   const [userStats, setUserStats] = useState({ totalRecipesGenerated: 0, totalRecipesLiked: 0 })
   const [isReturningUser, setIsReturningUser] = useState(false)
+  const [mealDataCache, setMealDataCache] = useState<MealDataCache>({})
+  const [loadingMeals, setLoadingMeals] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     const stats = getUserState()
@@ -55,8 +128,32 @@ export default function LikedMeals({ onBack, onStartOver }: LikedMealsProps) {
     setIsReturningUser(!shouldShowLandingPage())
   }, [])
 
-  const handleCardClick = (meal: FoodItem) => {
+  const fetchMealData = useCallback(async (meal: FoodItem) => {
+    if (mealDataCache[meal.id] || loadingMeals.has(meal.id)) {
+      return mealDataCache[meal.id]
+    }
+
+    setLoadingMeals(prev => new Set(prev).add(meal.id))
+
+    try {
+      const data = await getMealData(meal)
+      setMealDataCache(prev => ({ ...prev, [meal.id]: data }))
+      return data
+    } finally {
+      setLoadingMeals(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(meal.id)
+        return newSet
+      })
+    }
+  }, [mealDataCache, loadingMeals])
+
+  const handleCardClick = async (meal: FoodItem) => {
     setSelectedMeal(meal)
+    // Pre-fetch meal data if not already cached
+    if (!mealDataCache[meal.id]) {
+      await fetchMealData(meal)
+    }
   }
 
   const handleCloseModal = () => {
@@ -186,7 +283,8 @@ export default function LikedMeals({ onBack, onStartOver }: LikedMealsProps) {
         {selectedMeal && (
           <MealModal
             meal={selectedMeal}
-            mealData={getMealData(selectedMeal)}
+            mealData={mealDataCache[selectedMeal.id]}
+            isLoading={loadingMeals.has(selectedMeal.id)}
             onClose={handleCloseModal}
             onRemove={() => {
               removeLikedMeal(selectedMeal.id)
@@ -300,12 +398,13 @@ function GridMealCard({ meal, index, onClick, onRemove }: GridMealCardProps) {
 
 interface MealModalProps {
   meal: FoodItem
-  mealData: ReturnType<typeof getMealData>
+  mealData?: Awaited<ReturnType<typeof getMealData>>
+  isLoading: boolean
   onClose: () => void
   onRemove: () => void
 }
 
-function MealModal({ meal, mealData, onClose, onRemove }: MealModalProps) {
+function MealModal({ meal, mealData, isLoading, onClose, onRemove }: MealModalProps) {
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty) {
       case 'Easy': return 'text-green-600 bg-green-100'
@@ -315,7 +414,7 @@ function MealModal({ meal, mealData, onClose, onRemove }: MealModalProps) {
     }
   }
 
-  const totalIngredientPrice = mealData.ingredients.reduce((sum, ing) => sum + ing.price, 0)
+  const totalIngredientPrice = mealData?.ingredients.reduce((sum, ing) => sum + ing.price, 0) || 0
 
   return (
     <motion.div
@@ -344,19 +443,26 @@ function MealModal({ meal, mealData, onClose, onRemove }: MealModalProps) {
                 <DollarSign className="h-4 w-4 text-green-600" />
                 <span className="font-semibold text-green-600">${meal.price}</span>
               </div>
-              <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                <div className="flex items-center gap-1">
-                  <Clock className="h-4 w-4" />
-                  <span>{mealData.recipe.cookTime}min</span>
+              {isLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full"></div>
+                  <span>Loading recipe details...</span>
                 </div>
-                <div className="flex items-center gap-1">
-                  <Users className="h-4 w-4" />
-                  <span>{mealData.recipe.servings} servings</span>
+              ) : mealData ? (
+                <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-1">
+                    <Clock className="h-4 w-4" />
+                    <span>{mealData.recipe.cookTime}min</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Users className="h-4 w-4" />
+                    <span>{mealData.recipe.servings} servings</span>
+                  </div>
+                  <Badge className={`text-xs px-2 py-0.5 ${getDifficultyColor(mealData.recipe.difficulty)}`}>
+                    {mealData.recipe.difficulty}
+                  </Badge>
                 </div>
-                <Badge className={`text-xs px-2 py-0.5 ${getDifficultyColor(mealData.recipe.difficulty)}`}>
-                  {mealData.recipe.difficulty}
-                </Badge>
-              </div>
+              ) : null}
             </div>
           </div>
           <div className="flex gap-2 ml-4">
@@ -376,47 +482,61 @@ function MealModal({ meal, mealData, onClose, onRemove }: MealModalProps) {
 
         {/* Modal Content */}
         <div className="p-6 space-y-6">
-          {/* Recipe Description */}
-          <div>
-            <h4 className="font-semibold text-sm text-muted-foreground mb-2">RECIPE</h4>
-            <p className="text-sm leading-relaxed">{mealData.recipe.description}</p>
-          </div>
-
-          {/* Ingredients */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h4 className="font-semibold text-sm text-muted-foreground">INGREDIENTS</h4>
-              <span className="text-sm font-bold text-green-600">
-                Total: ${totalIngredientPrice.toFixed(2)}
-              </span>
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center py-12 space-y-4">
+              <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full"></div>
+              <p className="text-sm text-muted-foreground">Loading recipe details...</p>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              {mealData.ingredients.map((ingredient, idx) => (
-                <div key={idx} className="flex justify-between items-center p-3 bg-muted/30 rounded-lg">
-                  <div>
-                    <span className="text-sm font-medium">{ingredient.name}</span>
-                    <span className="text-xs text-muted-foreground ml-2">{ingredient.amount}</span>
-                  </div>
-                  <span className="text-xs font-semibold text-green-600">${ingredient.price.toFixed(2)}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+          ) : mealData ? (
+            <>
+              {/* Recipe Description */}
+              <div>
+                <h4 className="font-semibold text-sm text-muted-foreground mb-2">RECIPE</h4>
+                <p className="text-sm leading-relaxed">{mealData.recipe.description}</p>
+              </div>
 
-          {/* Instructions */}
-          <div>
-            <h4 className="font-semibold text-sm text-muted-foreground mb-3">INSTRUCTIONS</h4>
-            <ol className="space-y-3">
-              {mealData.recipe.instructions.map((step, idx) => (
-                <li key={idx} className="text-sm flex gap-3">
-                  <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs font-semibold flex-shrink-0 mt-0.5">
-                    {idx + 1}
+              {/* Ingredients */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="font-semibold text-sm text-muted-foreground">INGREDIENTS</h4>
+                  <span className="text-sm font-bold text-green-600">
+                    Total: ${totalIngredientPrice.toFixed(2)}
                   </span>
-                  <span className="leading-relaxed">{step}</span>
-                </li>
-              ))}
-            </ol>
-          </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {mealData.ingredients.map((ingredient: {name: string; amount: string; price: number}, idx: number) => (
+                    <div key={idx} className="flex justify-between items-center p-3 bg-muted/30 rounded-lg">
+                      <div>
+                        <span className="text-sm font-medium">{ingredient.name}</span>
+                        <span className="text-xs text-muted-foreground ml-2">{ingredient.amount}</span>
+                      </div>
+                      <span className="text-xs font-semibold text-green-600">${ingredient.price.toFixed(2)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Instructions */}
+              <div>
+                <h4 className="font-semibold text-sm text-muted-foreground mb-3">INSTRUCTIONS</h4>
+                <ol className="space-y-3">
+                  {mealData.recipe.instructions.map((step, idx) => (
+                    <li key={idx} className="text-sm flex gap-3">
+                      <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs font-semibold flex-shrink-0 mt-0.5">
+                        {idx + 1}
+                      </span>
+                      <span className="leading-relaxed">{step}</span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            </>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-12 space-y-4">
+              <div className="text-2xl">⚠️</div>
+              <p className="text-sm text-muted-foreground">Failed to load recipe details</p>
+            </div>
+          )}
 
           {/* Nutrition Info */}
           {meal.nutritionInfo && (
