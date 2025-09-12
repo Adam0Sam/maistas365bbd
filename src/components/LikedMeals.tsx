@@ -186,6 +186,9 @@ interface GridMealCardProps {
 }
 
 function GridMealCard({ meal, index, onClick, onRemove }: GridMealCardProps) {
+  const displayPrice = typeof meal.price === 'number' ? meal.price.toFixed(2) : '0.00'
+  const estimatedTime = Math.floor(Math.random() * 30) + 15
+  
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -197,47 +200,77 @@ function GridMealCard({ meal, index, onClick, onRemove }: GridMealCardProps) {
         layout: { duration: 0.3 }
       }}
       whileHover={{ 
-        scale: 1.03, 
-        y: -4,
+        scale: 1.02, 
+        y: -2,
         transition: { duration: 0.2 }
       }}
-      className="bg-card border border-border rounded-xl shadow-lg hover:shadow-xl cursor-pointer overflow-hidden"
+      className="bg-card border border-border rounded-xl shadow-lg hover:shadow-xl cursor-pointer overflow-hidden transition-all duration-200"
       onClick={onClick}
     >
       {/* Card Image */}
-      <div className="h-32 bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center">
-        <div className="text-3xl">🍽️</div>
+      <div className="h-32 bg-gradient-to-br from-orange-50 to-red-50 flex items-center justify-center relative">
+        <div className="text-4xl opacity-80">
+          {meal.category === 'recipe' ? '👨‍🍳' : '🍽️'}
+        </div>
+        {meal.category === 'recipe' && (
+          <div className="absolute top-2 right-2">
+            <Badge variant="outline" className="text-xs bg-white/80 backdrop-blur-sm">
+              Recipe
+            </Badge>
+          </div>
+        )}
       </div>
 
       {/* Card Content */}
-      <div className="p-4">
-        <div className="flex items-start justify-between mb-2">
-          <h3 className="text-lg font-bold line-clamp-1">{meal.name}</h3>
+      <div className="p-4 space-y-3">
+        {/* Title and Remove Button */}
+        <div className="flex items-start gap-2">
+          <h3 className="text-lg font-bold line-clamp-2 flex-1 leading-tight">
+            {meal.name}
+          </h3>
           <button
             onClick={(e) => {
               e.stopPropagation()
               onRemove()
             }}
-            className="p-1 rounded-full hover:bg-red-100 text-red-500 opacity-70 hover:opacity-100 transition-all"
+            className="p-1.5 rounded-full hover:bg-red-100 text-red-500 opacity-60 hover:opacity-100 transition-all duration-200 flex-shrink-0 mt-0.5"
           >
-            <Trash2 className="h-4 w-4" />
+            <Trash2 className="h-3.5 w-3.5" />
           </button>
         </div>
         
-        <div className="flex items-center gap-3 mb-3">
-          <Badge variant="secondary" className="text-xs">{meal.category}</Badge>
-          <div className="flex items-center gap-1">
-            <DollarSign className="h-3 w-3 text-green-600" />
-            <span className="font-semibold text-green-600">${meal.price}</span>
+        {/* Category and Price Row */}
+        <div className="flex items-center justify-between gap-2">
+          <Badge variant="secondary" className="text-xs px-2 py-1 truncate max-w-20">
+            {meal.category || 'food'}
+          </Badge>
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <DollarSign className="h-3.5 w-3.5 text-green-600" />
+            <span className="font-bold text-green-600 text-sm">
+              ${displayPrice}
+            </span>
           </div>
         </div>
 
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
-          <div className="flex items-center gap-1">
-            <Clock className="h-3 w-3" />
-            <span>{Math.floor(Math.random() * 30) + 15}min</span>
+        {/* Shop Name */}
+        {meal.shopName && (
+          <div className="flex items-center gap-1.5">
+            <ShoppingBag className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+            <span className="text-xs text-muted-foreground truncate">
+              {meal.shopName}
+            </span>
           </div>
-          <Heart className="h-4 w-4 text-red-500 fill-current" />
+        )}
+
+        {/* Time and Heart Row */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1">
+            <Clock className="h-3 w-3 text-muted-foreground" />
+            <span className="text-xs text-muted-foreground">
+              {estimatedTime}min
+            </span>
+          </div>
+          <Heart className="h-4 w-4 text-red-500 fill-current opacity-80" />
         </div>
       </div>
     </motion.div>
