@@ -8,6 +8,7 @@ import { RotateCcw, Check } from 'lucide-react'
 import { SwipeAction } from '@/types/food'
 import { PlannedRecipeResult } from '@/lib/generateAndParse'
 import { useLikedMeals } from '@/contexts/LikedMealsContext'
+import { incrementRecipesLiked } from '@/lib/localStorage'
 
 interface RecipeSwiperProps {
   recipes: PlannedRecipeResult[]
@@ -43,6 +44,9 @@ export default function RecipeSwiper({ recipes, onBack, onShowLikedMeals }: Reci
         category: 'recipe'
       }
       addLikedMeal(recipeAsFoodItem)
+      
+      // Update localStorage stats
+      incrementRecipesLiked(1)
     }
 
     if (isLastRecipe) {

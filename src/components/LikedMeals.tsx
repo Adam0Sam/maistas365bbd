@@ -6,7 +6,8 @@ import { Badge } from '@/components/ui/badge'
 import { ArrowLeft, Heart, ShoppingBag, DollarSign, Trash2, ChefHat, Clock, Users, X } from 'lucide-react'
 import { useLikedMeals } from '@/contexts/LikedMealsContext'
 import { FoodItem } from '@/types/food'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { getUserState, shouldShowLandingPage } from '@/lib/localStorage'
 
 interface LikedMealsProps {
   onBack: () => void
@@ -42,6 +43,17 @@ const getMealData = (meal: FoodItem) => ({
 export default function LikedMeals({ onBack, onStartOver }: LikedMealsProps) {
   const { likedMeals, removeLikedMeal, clearLikedMeals } = useLikedMeals()
   const [selectedMeal, setSelectedMeal] = useState<FoodItem | null>(null)
+  const [userStats, setUserStats] = useState({ totalRecipesGenerated: 0, totalRecipesLiked: 0 })
+  const [isReturningUser, setIsReturningUser] = useState(false)
+
+  useEffect(() => {
+    const stats = getUserState()
+    setUserStats({
+      totalRecipesGenerated: stats.totalRecipesGenerated,
+      totalRecipesLiked: stats.totalRecipesLiked
+    })
+    setIsReturningUser(!shouldShowLandingPage())
+  }, [])
 
   const handleCardClick = (meal: FoodItem) => {
     setSelectedMeal(meal)
@@ -82,9 +94,14 @@ export default function LikedMeals({ onBack, onStartOver }: LikedMealsProps) {
             className="text-center max-w-md"
           >
             <div className="text-6xl mb-6">🍽️</div>
-            <h2 className="text-2xl font-bold mb-4">No favorites yet!</h2>
+            <h2 className="text-2xl font-bold mb-4">
+              {isReturningUser ? 'Ready to discover more?' : 'No favorites yet!'}
+            </h2>
             <p className="text-muted-foreground mb-8">
-              Start swiping to discover meals you&apos;ll love and they&apos;ll appear here.
+              {isReturningUser 
+                ? `You've explored ${userStats.totalRecipesGenerated} recipes so far. Let's find more delicious meals!`
+                : "Start swiping to discover meals you'll love and they'll appear here."
+              }
             </p>
             <Button onClick={onStartOver} size="lg">
               <ChefHat className="h-5 w-5 mr-2" />
@@ -112,8 +129,12 @@ export default function LikedMeals({ onBack, onStartOver }: LikedMealsProps) {
         </Button>
         
         <div className="text-center">
-          <h1 className="text-xl font-bold">Your Favorites</h1>
-          <p className="text-sm text-muted-foreground">{likedMeals.length} meals</p>
+          <h1 className="text-xl font-bold">
+            {isReturningUser ? 'Welcome Back!' : 'Your Favorites'}
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            {likedMeals.length} saved • {userStats.totalRecipesGenerated} recipes explored
+          </p>
         </div>
 
         <Button 

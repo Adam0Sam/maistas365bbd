@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Input } from '@/components/ui/input'
 import { Search } from 'lucide-react'
@@ -8,6 +8,13 @@ import RecipeSwiper from '@/components/RecipeSwiper'
 import LikedMeals from '@/components/LikedMeals'
 import { LikedMealsProvider } from '@/contexts/LikedMealsContext'
 import type { PlannedRecipeResult } from '@/lib/generateAndParse'
+import { 
+  saveRecipesToStorage, 
+  getRecipesFromStorage,
+  shouldShowLandingPage,
+  markUserAsReturning,
+  incrementRecipesGenerated
+} from '@/lib/localStorage'
 
 function HomeContent() {
   const [query, setQuery] = useState('')
@@ -17,6 +24,29 @@ function HomeContent() {
   const [showLikedMeals, setShowLikedMeals] = useState(false)
   const [generatedRecipes, setGeneratedRecipes] = useState<PlannedRecipeResult[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [isInitialLoad, setIsInitialLoad] = useState(true)
+
+  // Check user state on component mount
+  useEffect(() => {
+    const initializeApp = () => {
+      const shouldShowLanding = shouldShowLandingPage()
+      
+      if (!shouldShowLanding) {
+        // Returning user - show liked meals by default
+        setShowLikedMeals(true)
+      }
+      
+      // Load any stored recipes
+      const storedRecipes = getRecipesFromStorage()
+      if (storedRecipes.length > 0) {
+        setGeneratedRecipes(storedRecipes)
+      }
+      
+      setIsInitialLoad(false)
+    }
+
+    initializeApp()
+  }, [])
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -44,8 +74,17 @@ function HomeContent() {
       }
       
       const results: PlannedRecipeResult[] = await response.json()
+      
+      // Save recipes to local storage
+      saveRecipesToStorage(results)
+      
+      // Update user state
+      incrementRecipesGenerated(results.length)
+      markUserAsReturning()
+      
       setGeneratedRecipes(results)
       setShowSwiper(true)
+      setShowLikedMeals(false) // Hide liked meals when showing new recipes
     } catch (err) {
       console.error('Recipe generation failed:', err)
       setError(err instanceof Error ? err.message : 'Failed to generate recipes')
@@ -63,15 +102,15 @@ function HomeContent() {
     setShowSwiper(false)
     setShowLikedMeals(false)
     setQuery('')
-    setGeneratedRecipes([])
     setError(null)
+    // Don't clear generatedRecipes - keep them in state and localStorage
   }
   
   const handleStartOver = () => {
     setShowLikedMeals(false)
     setQuery('')
-    setGeneratedRecipes([])
     setError(null)
+    // Don't clear generatedRecipes - keep them available
   }
 
   const fadeInUp = {
@@ -82,6 +121,26 @@ function HomeContent() {
 
   const staggerChildren = {
     animate: { transition: { staggerChildren: 0.2 } }
+  }
+
+  // Show loading spinner during initial load
+  if (isInitialLoad) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-white to-blue-50">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="text-center"
+        >
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+            className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"
+          />
+          <p className="text-lg font-medium text-muted-foreground">Loading Maistas365...</p>
+        </motion.div>
+      </div>
+    )
   }
 
   return (
@@ -139,7 +198,7 @@ function HomeContent() {
       </motion.nav> */}
 
       {/* Main Landing Page */}
-      {!showSwiper && (
+      {!showSwiper && !showLikedMeals && (
         <motion.main
           key="landing"
           initial={{ opacity: 1, y: 0 }}
