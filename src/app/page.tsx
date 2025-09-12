@@ -2,18 +2,19 @@
 
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Search } from 'lucide-react'
 import FoodSwiper from '@/components/FoodSwiper'
+import LikedMeals from '@/components/LikedMeals'
+import { LikedMealsProvider } from '@/contexts/LikedMealsContext'
 import { useFoodItems } from '@/data/mockFoodItems'
-import { SwipeResult } from '@/types/food'
 
-export default function Home() {
+function HomeContent() {
   const [query, setQuery] = useState('')
   const [isSearching, setIsSearching] = useState(false)
   const [isFocused, setIsFocused] = useState(false)
   const [showSwiper, setShowSwiper] = useState(false)
+  const [showLikedMeals, setShowLikedMeals] = useState(false)
   
   const { data: foodItems } = useFoodItems()
 
@@ -29,15 +30,19 @@ export default function Home() {
     }, 2000)
   }
 
-  const handleSwiperComplete = (results: SwipeResult[]) => {
-    console.log('Swipe results:', results)
-    // Handle the results - create recipe, go to cart, etc.
-    const likedItems = results.filter(r => r.action === 'like' || r.action === 'superlike')
-    console.log('Liked items:', likedItems)
+  const handleShowLikedMeals = () => {
+    setShowSwiper(false)
+    setShowLikedMeals(true)
   }
 
   const handleBackToSearch = () => {
     setShowSwiper(false)
+    setShowLikedMeals(false)
+    setQuery('')
+  }
+  
+  const handleStartOver = () => {
+    setShowLikedMeals(false)
     setQuery('')
   }
 
@@ -203,11 +208,27 @@ export default function Home() {
       {showSwiper && foodItems && (
         <FoodSwiper
           foodItems={foodItems}
-          onComplete={handleSwiperComplete}
           onBack={handleBackToSearch}
+          onShowLikedMeals={handleShowLikedMeals}
+        />
+      )}
+
+      {/* Liked Meals */}
+      {showLikedMeals && (
+        <LikedMeals
+          onBack={handleBackToSearch}
+          onStartOver={handleStartOver}
         />
       )}
       </AnimatePresence>
     </div>
+  )
+}
+
+export default function Home() {
+  return (
+    <LikedMealsProvider>
+      <HomeContent />
+    </LikedMealsProvider>
   )
 }

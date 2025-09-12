@@ -245,7 +245,7 @@ export default function FoodCard({ foodItem, onSwipe, isTop = false }: FoodCardP
                 transition={{ type: "spring", stiffness: 300, damping: 20 }}
                 onClick={() => handleButtonAction('dislike')}
                 disabled={!foodItem.isAvailable}
-                className="h-20 w-20 rounded-full border-3 bg-gradient-to-br from-red-100 to-red-50 border-red-300 hover:border-red-500 hover:bg-red-500 hover:text-red-600 shadow-lg hover:shadow-xl hover:shadow-red-200 transition-all duration-300 backdrop-blur-sm disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-red-500 "
+                className="h-20 w-20 rounded-full border-3 bg-gradient-to-br from-red-100 to-red-50 border-red-300 hover:border-red-500 hover:bg-red-500 hover:text-red-600 shadow-lg hover:shadow-xl hover:shadow-red-200 transition-all duration-300 backdrop-blur-sm disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-red-500 cursor-pointer"
               >
                 <X className="h-8 w-8" />
               </motion.button>
@@ -255,7 +255,7 @@ export default function FoodCard({ foodItem, onSwipe, isTop = false }: FoodCardP
                 whileTap={{ scale: 0.9 }}
                 onClick={() => handleButtonAction('like')}
                 disabled={!foodItem.isAvailable}
-                className="h-20 w-20 rounded-full border-3 bg-gradient-to-br from-green-100 to-green-50 border-green-300 hover:border-green-500 hover:bg-green-500 shadow-lg hover:shadow-xl hover:shadow-green-200 transition-all duration-300 backdrop-blur-sm disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-green-500 hover:text-green-600"
+                className="h-20 w-20 rounded-full border-3 bg-gradient-to-br from-green-100 to-green-50 border-green-300 hover:border-green-500 hover:bg-green-500 shadow-lg hover:shadow-xl hover:shadow-green-200 transition-all duration-300 backdrop-blur-sm disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-green-500 hover:text-green-600 cursor-pointer"
               >
                 <Heart className="h-8 w-8" />
               </motion.button>

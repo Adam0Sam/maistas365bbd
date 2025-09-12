@@ -5,41 +5,35 @@ import { motion, AnimatePresence } from 'framer-motion'
 import FoodCard from './FoodCard'
 import { Button } from '@/components/ui/button'
 import { RotateCcw, Check } from 'lucide-react'
-import { FoodItem, SwipeAction, SwipeResult } from '@/types/food'
+import { FoodItem, SwipeAction } from '@/types/food'
+import { useLikedMeals } from '@/contexts/LikedMealsContext'
 
 interface FoodSwiperProps {
   foodItems: FoodItem[]
-  onComplete: (results: SwipeResult[]) => void
   onBack: () => void
+  onShowLikedMeals: () => void
 }
 
-export default function FoodSwiper({ foodItems, onComplete, onBack }: FoodSwiperProps) {
+export default function FoodSwiper({ foodItems, onBack, onShowLikedMeals }: FoodSwiperProps) {
   const [currentIndex, setCurrentIndex] = useState(0)
-  const [swipeResults, setSwipeResults] = useState<SwipeResult[]>([])
-  const [likedItems, setLikedItems] = useState<FoodItem[]>([])
+  const { addLikedMeal, getLikedMealsCount } = useLikedMeals()
 
   const currentCard = foodItems[currentIndex]
   const nextCard = foodItems[currentIndex + 1]
   const isLastCard = currentIndex === foodItems.length - 1
+  const likedCount = getLikedMealsCount()
 
   const handleSwipe = (action: SwipeAction) => {
     if (!currentCard) return
 
-    const result: SwipeResult = {
-      foodItem: currentCard,
-      action
-    }
-
-    setSwipeResults(prev => [...prev, result])
-
     if (action === 'like' || action === 'superlike') {
-      setLikedItems(prev => [...prev, currentCard])
+      addLikedMeal(currentCard)
     }
 
     if (isLastCard) {
-      // Complete the swiping experience
+      // Complete the swiping experience - show liked meals
       setTimeout(() => {
-        onComplete([...swipeResults, result])
+        onShowLikedMeals()
       }, 300)
     } else {
       setCurrentIndex(prev => prev + 1)
@@ -48,8 +42,6 @@ export default function FoodSwiper({ foodItems, onComplete, onBack }: FoodSwiper
 
   const handleReset = () => {
     setCurrentIndex(0)
-    setSwipeResults([])
-    setLikedItems([])
   }
 
 
@@ -93,7 +85,7 @@ export default function FoodSwiper({ foodItems, onComplete, onBack }: FoodSwiper
 
       {/* Header */}
       <div className="p-4 border-b border-border flex justify-between items-center bg-background/80 backdrop-blur-lg z-50">
-        <Button variant="secondary" size="sm" onClick={onBack} className="shadow-md hover:shadow-lg transition-all duration-200">
+        <Button variant="secondary" size="sm" onClick={onBack} className="shadow-md hover:shadow-lg transition-all duration-200 cursor-pointer">
           <RotateCcw className="h-4 w-4 mr-2" />
           Back to Search
         </Button>
@@ -103,13 +95,13 @@ export default function FoodSwiper({ foodItems, onComplete, onBack }: FoodSwiper
             {currentIndex + 1} / {foodItems.length}
           </div>
           <div className="text-sm text-muted-foreground">
-            {likedItems.length} liked
+            {likedCount} liked
           </div>
         </div>
 
-        <Button variant="default" size="sm" onClick={() => onComplete(swipeResults)} className="shadow-md hover:shadow-lg transition-all duration-200">
+        <Button variant="default" size="sm" onClick={onShowLikedMeals} className="shadow-md hover:shadow-lg transition-all duration-200 cursor-pointer">
           <Check className="h-4 w-4 mr-2" />
-          Done ({likedItems.length})
+          Done ({likedCount})
         </Button>
       </div>
 
@@ -161,14 +153,14 @@ export default function FoodSwiper({ foodItems, onComplete, onBack }: FoodSwiper
               <div className="text-6xl mb-6">🎉</div>
               <h2 className="text-3xl font-bold mb-4">All done!</h2>
               <p className="text-lg text-muted-foreground mb-8">
-                You've reviewed {foodItems.length} items and liked {likedItems.length}
+                You've reviewed {foodItems.length} items and liked {likedCount}
               </p>
               <div className="flex gap-4">
                 <Button onClick={handleReset} variant="outline">
                   Review Again
                 </Button>
-                <Button onClick={() => onComplete(swipeResults)}>
-                  Create Recipe
+                <Button onClick={onShowLikedMeals}>
+                  View Favorites
                 </Button>
               </div>
             </motion.div>
@@ -184,7 +176,7 @@ export default function FoodSwiper({ foodItems, onComplete, onBack }: FoodSwiper
           transition={{ delay: 0.7 }}
           className="p-4 bg-muted/50 text-center text-sm text-muted-foreground"
         >
-          Swipe right to like • Swipe left to pass • Tap star for super like
+          Swipe right to like • Swipe left to pass
         </motion.div>
       )}
     </motion.div>
