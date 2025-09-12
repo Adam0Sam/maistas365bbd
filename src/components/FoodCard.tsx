@@ -1,11 +1,11 @@
 'use client'
 
-import { motion, useMotionValue, useTransform } from 'framer-motion'
+import { motion, useMotionValue, useTransform, useAnimation, PanInfo } from 'framer-motion'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Heart, X, ShoppingBag, DollarSign } from 'lucide-react'
 import { FoodItem, SwipeAction } from '@/types/food'
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 
 interface FoodCardProps {
   foodItem: FoodItem
@@ -15,64 +15,141 @@ interface FoodCardProps {
 
 export default function FoodCard({ foodItem, onSwipe, isTop = false }: FoodCardProps) {
   const [isExiting, setIsExiting] = useState(false)
+  const controls = useAnimation()
+  const constraintsRef = useRef(null)
   
   // Drag controls
   const x = useMotionValue(0)
   const y = useMotionValue(0)
   
-  // Transform drag distance to rotation and opacity
-  const rotate = useTransform(x, [-200, 200], [-25, 25])
-  const opacity = useTransform(x, [-200, -100, 0, 100, 200], [0, 1, 1, 1, 0])
+  // Improved transform ranges for better animation feel
+  const rotate = useTransform(x, [-300, 0, 300], [-30, 0, 30])
+  const opacity = useTransform(x, [-300, -150, 0, 150, 300], [0, 0.7, 1, 0.7, 0])
   
-  // Color overlays based on drag direction
-  const likeOpacity = useTransform(x, [0, 100], [0, 0.5])
-  const dislikeOpacity = useTransform(x, [-100, 0], [0.5, 0])
+  // Enhanced overlay animations with smoother transitions
+  const likeOpacity = useTransform(x, [0, 50, 150], [0, 0.3, 0.7])
+  const dislikeOpacity = useTransform(x, [-150, -50, 0], [0.7, 0.3, 0])
+  const likeScale = useTransform(x, [0, 100, 200], [0.8, 1, 1.1])
+  const dislikeScale = useTransform(x, [-200, -100, 0], [1.1, 1, 0.8])
 
-  const handleDragEnd = () => {
+  const handleDragEnd = (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
     const currentX = x.get()
+    const velocity = info.velocity.x
+    const dragDistance = Math.abs(currentX)
+    const velocityThreshold = 500
     
-    if (Math.abs(currentX) > 100) {
+    // Determine if swipe should trigger based on distance OR velocity
+    const shouldSwipe = dragDistance > 100 || Math.abs(velocity) > velocityThreshold
+    
+    if (shouldSwipe) {
       setIsExiting(true)
-      const action: SwipeAction = currentX > 0 ? 'like' : 'dislike'
-      setTimeout(() => onSwipe(action), 200)
+      const action: SwipeAction = currentX > 0 || velocity > 0 ? 'like' : 'dislike'
+      
+      // Animate card off screen in the direction of swipe with improved physics
+      const exitX = action === 'like' ? 500 : -500
+      const exitRotate = action === 'like' ? 45 : -45
+      
+      controls.start({
+        x: exitX,
+        y: Math.abs(velocity) > velocityThreshold ? -100 : 0,
+        rotate: exitRotate,
+        opacity: 0,
+        scale: 0.8,
+        transition: {
+          type: 'spring',
+          stiffness: 300,
+          damping: 25,
+          duration: 0.4
+        }
+      })
+      
+      setTimeout(() => onSwipe(action), 300)
+    } else {
+      // Spring back to center with improved physics
+      controls.start({
+        x: 0,
+        y: 0,
+        rotate: 0,
+        scale: 1,
+        transition: {
+          type: 'spring',
+          stiffness: 400,
+          damping: 30,
+          mass: 0.8
+        }
+      })
     }
   }
 
   const handleButtonAction = (action: SwipeAction) => {
     setIsExiting(true)
     
-    // Animate card in the direction of the action
+    // Smooth button-triggered animations
     if (action === 'like') {
-      x.set(300)
+      controls.start({
+        x: 500,
+        rotate: 30,
+        opacity: 0,
+        scale: 0.8,
+        transition: { type: 'spring', stiffness: 300, damping: 25, duration: 0.4 }
+      })
     } else if (action === 'dislike') {
-      x.set(-300)
+      controls.start({
+        x: -500,
+        rotate: -30,
+        opacity: 0,
+        scale: 0.8,
+        transition: { type: 'spring', stiffness: 300, damping: 25, duration: 0.4 }
+      })
     } else if (action === 'superlike') {
-      y.set(-300)
+      controls.start({
+        y: -500,
+        rotate: 0,
+        opacity: 0,
+        scale: 1.2,
+        transition: { type: 'spring', stiffness: 300, damping: 25, duration: 0.4 }
+      })
     }
     
-    setTimeout(() => onSwipe(action), 200)
+    setTimeout(() => onSwipe(action), 350)
   }
 
   return (
     <motion.div
+      ref={constraintsRef}
       className={`absolute inset-0 ${isTop ? 'z-20' : 'z-10'} flex flex-col justify-center items-center`}
       style={{ x, y, rotate, opacity }}
-      drag
-      dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
+      animate={controls}
+      drag={!isExiting}
+      dragConstraints={{
+        left: -300,
+        right: 300,
+        top: -100,
+        bottom: 100
+      }}
+      dragElastic={0.2}
+      dragMomentum={false}
       onDragEnd={handleDragEnd}
-      animate={isExiting ? { scale: 0.8 } : { scale: 1 }}
-      transition={{ type: "spring", stiffness: 300, damping: 20 }}
-      whileDrag={{ scale: 1.05, zIndex: 30 }}
+      whileDrag={{ 
+        scale: 1.05, 
+        zIndex: 30,
+        cursor: 'grabbing'
+      }}
+      initial={{ scale: 1 }}
+      transition={{ type: 'spring', stiffness: 260, damping: 20 }}
     >
-      <Card className="h-full bg-background shadow-2xl border-2 border-border relative overflow-hidden h-[80%] w-96">
+      <Card className="bg-background shadow-2xl border-2 border-border relative overflow-hidden h-[80%] w-96">
         {/* Like Overlay */}
         <motion.div 
           className="absolute inset-0 bg-success/20 flex items-center justify-center z-10 pointer-events-none"
           style={{ opacity: likeOpacity }}
         >
-          <div className="border-4 border-success rounded-2xl px-8 py-4 rotate-12">
+          <motion.div 
+            className="border-4 border-success rounded-2xl px-8 py-4 rotate-12"
+            style={{ scale: likeScale }}
+          >
             <span className="text-4xl font-bold text-success">LIKE</span>
-          </div>
+          </motion.div>
         </motion.div>
         
         {/* Dislike Overlay */}
@@ -80,9 +157,12 @@ export default function FoodCard({ foodItem, onSwipe, isTop = false }: FoodCardP
           className="absolute inset-0 bg-error/20 flex items-center justify-center z-10 pointer-events-none"
           style={{ opacity: dislikeOpacity }}
         >
-          <div className="border-4 border-error rounded-2xl px-8 py-4 -rotate-12">
+          <motion.div 
+            className="border-4 border-error rounded-2xl px-8 py-4 -rotate-12"
+            style={{ scale: dislikeScale }}
+          >
             <span className="text-4xl font-bold text-error">NOPE</span>
-          </div>
+          </motion.div>
         </motion.div>
 
         <CardContent className="p-0 h-full flex flex-col">
