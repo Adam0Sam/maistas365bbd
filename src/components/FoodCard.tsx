@@ -1,7 +1,6 @@
 'use client'
 
 import { motion, useMotionValue, useTransform, useAnimation, PanInfo } from 'framer-motion'
-import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Heart, X, ShoppingBag, DollarSign } from 'lucide-react'
 import { FoodItem, SwipeAction } from '@/types/food'
@@ -31,6 +30,10 @@ export default function FoodCard({ foodItem, onSwipe, isTop = false }: FoodCardP
   const dislikeOpacity = useTransform(x, [-150, -50, 0], [0.7, 0.3, 0])
   const likeScale = useTransform(x, [0, 100, 200], [0.8, 1, 1.1])
   const dislikeScale = useTransform(x, [-200, -100, 0], [1.1, 1, 0.8])
+  
+  // Dynamic border color based on swipe direction
+  const borderColor = useTransform(x, [-150, -50, 0, 50, 150], ['rgb(239, 68, 68)', 'rgb(156, 163, 175)', 'rgb(156, 163, 175)', 'rgb(34, 197, 94)', 'rgb(34, 197, 94)'])
+  const borderWidth = useTransform(x, [-150, -50, 0, 50, 150], [4, 2, 2, 2, 4])
 
   const handleDragEnd = (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
     const currentX = x.get()
@@ -138,34 +141,51 @@ export default function FoodCard({ foodItem, onSwipe, isTop = false }: FoodCardP
       initial={{ scale: 1 }}
       transition={{ type: 'spring', stiffness: 260, damping: 20 }}
     >
-      <Card className="bg-background shadow-2xl border-2 border-border relative overflow-hidden h-[80%] w-96">
+      <motion.div
+        className="bg-background shadow-2xl border-2 relative overflow-hidden h-[80%] w-96 rounded-lg"
+        style={{ 
+          borderColor, 
+          borderWidth,
+          boxShadow: useTransform(x, 
+            [-150, 0, 150], 
+            ['0 20px 25px -5px rgba(239, 68, 68, 0.3), 0 10px 10px -5px rgba(239, 68, 68, 0.1)', 
+             '0 25px 50px -12px rgba(0, 0, 0, 0.25)', 
+             '0 20px 25px -5px rgba(34, 197, 94, 0.3), 0 10px 10px -5px rgba(34, 197, 94, 0.1)'])
+        }}
+      >
         {/* Like Overlay */}
         <motion.div 
-          className="absolute inset-0 bg-success/20 flex items-center justify-center z-10 pointer-events-none"
-          style={{ opacity: likeOpacity }}
+          className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none"
+          style={{ 
+            opacity: likeOpacity,
+            background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.8), rgba(16, 185, 129, 0.6), rgba(5, 150, 105, 0.4))'
+          }}
         >
           <motion.div 
-            className="border-4 border-success rounded-2xl px-8 py-4 rotate-12"
+            className="border-4 border-white rounded-2xl px-8 py-4 rotate-12 bg-white/20 backdrop-blur-sm shadow-xl"
             style={{ scale: likeScale }}
           >
-            <span className="text-4xl font-bold text-success">LIKE</span>
+            <span className="text-5xl font-black text-white drop-shadow-2xl tracking-wide">LIKE</span>
           </motion.div>
         </motion.div>
         
         {/* Dislike Overlay */}
         <motion.div 
-          className="absolute inset-0 bg-error/20 flex items-center justify-center z-10 pointer-events-none"
-          style={{ opacity: dislikeOpacity }}
+          className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none"
+          style={{ 
+            opacity: dislikeOpacity,
+            background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.8), rgba(220, 38, 38, 0.6), rgba(185, 28, 28, 0.4))'
+          }}
         >
           <motion.div 
-            className="border-4 border-error rounded-2xl px-8 py-4 -rotate-12"
+            className="border-4 border-white rounded-2xl px-8 py-4 -rotate-12 bg-white/20 backdrop-blur-sm shadow-xl"
             style={{ scale: dislikeScale }}
           >
-            <span className="text-4xl font-bold text-error">NOPE</span>
+            <span className="text-5xl font-black text-white drop-shadow-2xl tracking-wide">NOPE</span>
           </motion.div>
         </motion.div>
 
-        <CardContent className="p-0 h-full flex flex-col">
+        <div className="p-0 h-full flex flex-col">
           {/* Food Image */}
           <div className="relative h-64 bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center">
             <div className="text-6xl opacity-30">🍽️</div>
@@ -241,8 +261,8 @@ export default function FoodCard({ foodItem, onSwipe, isTop = false }: FoodCardP
               </motion.button>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </motion.div>
     </motion.div>
   )
 }
