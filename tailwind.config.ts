@@ -136,18 +136,6 @@ export default {
           950: '#020617',
         },
       },
-      backgroundImage: {
-        // Gradient combinations for natural, wellness-focused brand
-        'gradient-primary': 'linear-gradient(135deg, #4c9f70 0%, #496f5d 100%)',
-        'gradient-secondary': 'linear-gradient(135deg, #8ea4d2 0%, #6279b8 100%)',
-        'gradient-accent': 'linear-gradient(135deg, #6279b8 0%, #49516f 100%)',
-        'gradient-success': 'linear-gradient(135deg, #4c9f70 0%, #8ea4d2 100%)',
-        'gradient-foundation': 'linear-gradient(135deg, #496f5d 0%, #49516f 100%)',
-        'gradient-hero': 'linear-gradient(135deg, #8ea4d2 0%, #6279b8 25%, #49516f 50%, #496f5d 75%, #4c9f70 100%)',
-        'gradient-mesh': 'radial-gradient(circle at 20% 80%, #4c9f70 0%, transparent 50%), radial-gradient(circle at 80% 20%, #8ea4d2 0%, transparent 50%), radial-gradient(circle at 40% 40%, #6279b8 0%, transparent 50%)',
-        'gradient-card': 'linear-gradient(145deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%)',
-        'gradient-glow': 'radial-gradient(ellipse at center, rgba(76,159,112,0.15) 0%, transparent 70%)',
-      },
       animation: {
         'fade-in': 'fadeIn 0.5s ease-in-out',
         'slide-up': 'slideUp 0.5s ease-out',

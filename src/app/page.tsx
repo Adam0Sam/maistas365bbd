@@ -1,15 +1,21 @@
 'use client'
 
 import { useState } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Search } from 'lucide-react'
+import FoodSwiper from '@/components/FoodSwiper'
+import { useFoodItems } from '@/data/mockFoodItems'
+import { SwipeResult } from '@/types/food'
 
 export default function Home() {
   const [query, setQuery] = useState('')
   const [isSearching, setIsSearching] = useState(false)
   const [isFocused, setIsFocused] = useState(false)
+  const [showSwiper, setShowSwiper] = useState(false)
+  
+  const { data: foodItems } = useFoodItems()
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -19,8 +25,20 @@ export default function Home() {
     // Simulate search - replace with actual LLM integration later
     setTimeout(() => {
       setIsSearching(false)
-      console.log('Searching for:', query)
+      setShowSwiper(true)
     }, 2000)
+  }
+
+  const handleSwiperComplete = (results: SwipeResult[]) => {
+    console.log('Swipe results:', results)
+    // Handle the results - create recipe, go to cart, etc.
+    const likedItems = results.filter(r => r.action === 'like' || r.action === 'superlike')
+    console.log('Liked items:', likedItems)
+  }
+
+  const handleBackToSearch = () => {
+    setShowSwiper(false)
+    setQuery('')
   }
 
   const fadeInUp = {
@@ -35,17 +53,18 @@ export default function Home() {
 
   return (
     <div className="min-h-screen relative overflow-hidden">
+      <AnimatePresence mode="wait">
       {/* Base Background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-secondary-50 via-background to-primary-50"></div>
+      <div className="absolute inset-0 bg-gradient-to-br from-slate-50 via-white to-blue-50"></div>
       
       {/* Mesh Pattern Overlay */}
-      <div className="absolute inset-0 bg-gradient-mesh opacity-30"></div>
+      <div className="absolute inset-0 bg-gradient-to-br from-gray-100/50 to-slate-200/50 opacity-30"></div>
       
       {/* Large Floating Orbs - More Prominent */}
-      <div className="absolute top-10 left-5 w-[500px] h-[500px] bg-gradient-primary rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-float"></div>
-      <div className="absolute bottom-10 right-5 w-[450px] h-[450px] bg-gradient-secondary rounded-full mix-blend-multiply filter blur-3xl opacity-35 animate-float" style={{ animationDelay: '2s' }}></div>
-      <div className="absolute top-1/3 right-1/4 w-[600px] h-[600px] bg-gradient-accent rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-float" style={{ animationDelay: '4s' }}></div>
-      <div className="absolute bottom-1/3 left-1/4 w-[400px] h-[400px] bg-gradient-foundation rounded-full mix-blend-multiply filter blur-3xl opacity-25 animate-float" style={{ animationDelay: '6s' }}></div>
+      <div className="absolute top-10 left-5 w-[500px] h-[500px] bg-gradient-to-br from-blue-400 to-green-500 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-float"></div>
+      <div className="absolute bottom-10 right-5 w-[450px] h-[450px] bg-gradient-to-br from-purple-400 to-blue-500 rounded-full mix-blend-multiply filter blur-3xl opacity-35 animate-float" style={{ animationDelay: '2s' }}></div>
+      <div className="absolute top-1/3 right-1/4 w-[600px] h-[600px] bg-gradient-to-br from-indigo-400 to-purple-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-float" style={{ animationDelay: '4s' }}></div>
+      <div className="absolute bottom-1/3 left-1/4 w-[400px] h-[400px] bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full mix-blend-multiply filter blur-3xl opacity-25 animate-float" style={{ animationDelay: '6s' }}></div>
       
       {/* Medium Floating Bubbles */}
       <div className="absolute top-20 right-32 w-32 h-32 bg-primary/20 rounded-full animate-float filter blur-xl" style={{ animationDelay: '1s', animationDuration: '8s' }}></div>
@@ -73,7 +92,7 @@ export default function Home() {
           <div className="flex justify-between items-center py-4">
             <motion.div
               whileHover={{ scale: 1.05 }}
-              className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent"
+              className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent"
             >
               Maistas365
             </motion.div>
@@ -86,19 +105,27 @@ export default function Home() {
         </div>
       </motion.nav> */}
 
-      {/* Hero Section */}
-      <main className="relative z-10 container mx-auto px-4 py-16 lg:py-24 h-lvh flex flex-col justify-center">
-        <motion.div
-          variants={staggerChildren}
-          initial="initial"
-          animate="animate"
-          className="text-center max-w-4xl mx-auto flex flex-col justify-between w-full"
+      {/* Main Landing Page */}
+      {!showSwiper && (
+        <motion.main
+          key="landing"
+          initial={{ opacity: 1, y: 0 }}
+          animate={showSwiper ? { opacity: 0, y: -100, scale: 0.8 } : { opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: -100, scale: 0.8 }}
+          transition={{ duration: 0.6, ease: "easeInOut" }}
+          className="relative z-10 container mx-auto px-4 py-16 lg:py-24 h-lvh flex flex-col justify-center"
         >
+          <motion.div
+            variants={staggerChildren}
+            initial="initial"
+            animate="animate"
+            className="text-center max-w-4xl mx-auto flex flex-col justify-between w-full"
+          >
           {/* Main Heading - Supporting Element */}
           <motion.div variants={fadeInUp} className="mb-14">
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-4">
               <span 
-                className="bg-clip-text text-transparent bg-gradient-to-r from-secondary-400 via-accent-500 to-primary-500"
+                className="bg-clip-text text-transparent bg-gradient-to-r from-slate-600 via-indigo-600 to-blue-600"
                 style={{
                   backgroundImage: 'linear-gradient(135deg, #8ea4d2 0%, #6279b8 25%, #49516f 50%, #496f5d 75%, #4c9f70 100%)'
                 }}
@@ -107,7 +134,7 @@ export default function Home() {
               </span>
               <br />
               <span 
-                className="bg-clip-text text-transparent bg-gradient-to-r from-secondary-400 via-accent-500 to-primary-500"
+                className="bg-clip-text text-transparent bg-gradient-to-r from-slate-600 via-indigo-600 to-blue-600"
                 style={{
                   backgroundImage: 'linear-gradient(135deg, #8ea4d2 0%, #6279b8 25%, #49516f 50%, #496f5d 75%, #4c9f70 100%)'
                 }}
@@ -137,8 +164,8 @@ export default function Home() {
                     onChange={(e) => setQuery(e.target.value)}
                     onFocus={() => setIsFocused(true)}
                     onBlur={() => setIsFocused(false)}
-                    placeholder={isFocused ? "" : "What delicious meal would you like to create today?"}
-                    className="h-24 pl-20 pr-52 text-2xl text-center rounded-full border-4 focus:border-primary/30 shadow-2xl hover:shadow-3xl transition-all duration-300 bg-background/95 backdrop-blur-lg font-medium placeholder:text-muted-foreground/60"
+                    placeholder={isFocused ? "" : "Chinese lamb with a dash of sechuan sauce"}
+                    className="h-24 pl-20 pr-52 text-9xl text-center rounded-full border-4 focus:border-primary/30 shadow-2xl hover:shadow-3xl transition-all duration-300 bg-background/95 backdrop-blur-lg font-medium placeholder:text-muted-foreground/60"
                   />
                   <div className="absolute right-6 top-1/2 transform -translate-y-1/2">
                     <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
@@ -171,8 +198,19 @@ export default function Home() {
 
           {/* Feature Cards - Simplified */}
           
-        </motion.div>
-      </main>
+          </motion.div>
+        </motion.main>
+      )}
+
+      {/* Food Swiper */}
+      {showSwiper && foodItems && (
+        <FoodSwiper
+          foodItems={foodItems}
+          onComplete={handleSwiperComplete}
+          onBack={handleBackToSearch}
+        />
+      )}
+      </AnimatePresence>
     </div>
   )
 }
