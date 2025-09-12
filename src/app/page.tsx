@@ -4,10 +4,10 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Input } from '@/components/ui/input'
 import { Search } from 'lucide-react'
-import FoodSwiper from '@/components/FoodSwiper'
+import RecipeSwiper from '@/components/RecipeSwiper'
 import LikedMeals from '@/components/LikedMeals'
 import { LikedMealsProvider } from '@/contexts/LikedMealsContext'
-import { useFoodItems } from '@/data/mockFoodItems'
+import type { PlannedRecipeResult } from '@/lib/generateAndParse'
 
 function HomeContent() {
   const [query, setQuery] = useState('')
@@ -15,19 +15,43 @@ function HomeContent() {
   const [isFocused, setIsFocused] = useState(false)
   const [showSwiper, setShowSwiper] = useState(false)
   const [showLikedMeals, setShowLikedMeals] = useState(false)
-  
-  const { data: foodItems } = useFoodItems()
+  const [generatedRecipes, setGeneratedRecipes] = useState<PlannedRecipeResult[]>([])
+  const [error, setError] = useState<string | null>(null)
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!query.trim()) return
     
     setIsSearching(true)
-    // Simulate search - replace with actual LLM integration later
-    setTimeout(() => {
-      setIsSearching(false)
+    setError(null)
+    
+    try {
+      const response = await fetch('/api/chat/generateBatch', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          requirements: query,
+          prompt: 'Create diverse, practical recipes that can be prepared at home',
+          fields: ['productId', 'name', 'price', 'shop', 'available', 'image'],
+          limit: 8
+        })
+      })
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      
+      const results: PlannedRecipeResult[] = await response.json()
+      setGeneratedRecipes(results)
       setShowSwiper(true)
-    }, 2000)
+    } catch (err) {
+      console.error('Recipe generation failed:', err)
+      setError(err instanceof Error ? err.message : 'Failed to generate recipes')
+    } finally {
+      setIsSearching(false)
+    }
   }
 
   const handleShowLikedMeals = () => {
@@ -39,11 +63,15 @@ function HomeContent() {
     setShowSwiper(false)
     setShowLikedMeals(false)
     setQuery('')
+    setGeneratedRecipes([])
+    setError(null)
   }
   
   const handleStartOver = () => {
     setShowLikedMeals(false)
     setQuery('')
+    setGeneratedRecipes([])
+    setError(null)
   }
 
   const fadeInUp = {
@@ -170,6 +198,7 @@ function HomeContent() {
                     onFocus={() => setIsFocused(true)}
                     onBlur={() => setIsFocused(false)}
                     placeholder={isFocused ? "" : "Chinese lamb with a dash of sechuan sauce"}
+                    disabled={isSearching}
                     className="h-24 pl-20 pr-20 text-9xl text-center rounded-full border-4 focus:border-primary/30 shadow-2xl hover:shadow-3xl transition-all duration-300 bg-background/95 backdrop-blur-lg font-medium placeholder:text-muted-foreground/60"
                   />
                   <motion.button
@@ -193,6 +222,19 @@ function HomeContent() {
               </div>
               
               
+              {/* Error Display */}
+              {error && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mt-4 p-4 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive text-center"
+                >
+                  <p className="font-medium">Failed to generate recipes</p>
+                  <p className="text-sm mt-1">{error}</p>
+                  <p className="text-xs mt-2 text-muted-foreground">Please try a different query or check your connection.</p>
+                </motion.div>
+              )}
+              
               {/* Subtle Glow Effect */}
               {/* <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-accent/5 to-secondary/5 rounded-full blur-2xl -z-10 scale-110"></div> */}
             </div>
@@ -204,10 +246,10 @@ function HomeContent() {
         </motion.main>
       )}
 
-      {/* Food Swiper */}
-      {showSwiper && foodItems && (
-        <FoodSwiper
-          foodItems={foodItems}
+      {/* Recipe Swiper */}
+      {showSwiper && generatedRecipes.length > 0 && (
+        <RecipeSwiper
+          recipes={generatedRecipes}
           onBack={handleBackToSearch}
           onShowLikedMeals={handleShowLikedMeals}
         />

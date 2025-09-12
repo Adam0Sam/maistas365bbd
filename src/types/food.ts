@@ -30,6 +30,37 @@ export interface Recipe {
   tags: string[] // e.g., ["high-protein", "vegetarian", "quick"]
 }
 
+// New types for AI-generated recipes
+export interface AIGeneratedIngredient {
+  name: string
+  quantity: string
+  search_description?: string
+}
+
+export interface AIGeneratedRecipe {
+  title: string
+  description: string
+  servings: number
+  ingredients: AIGeneratedIngredient[]
+  instructions: string[]
+}
+
+export interface ShoppingListItem {
+  ingredient: string
+  chosen_product: {
+    productId: string
+    name: string
+    price: number
+    shop: string
+  }
+}
+
+export interface RecipePlan {
+  ingredients: AIGeneratedIngredient[]
+  candidates: Record<string, any[]>
+  shopping_list: ShoppingListItem[]
+}
+
 export type SwipeAction = 'like' | 'dislike' | 'superlike'
 
 export interface SwipeResult {
