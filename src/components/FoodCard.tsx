@@ -60,13 +60,13 @@ export default function FoodCard({ foodItem, onSwipe, isTop = false }: FoodCardP
         scale: 0.8,
         transition: {
           type: 'spring',
-          stiffness: 300,
-          damping: 25,
-          duration: 0.4
+          stiffness: 120,
+          damping: 30,
+          duration: 3.2
         }
       })
       
-      setTimeout(() => onSwipe(action), 300)
+      setTimeout(() => onSwipe(action), 200)
     } else {
       // Spring back to center with improved physics
       controls.start({
@@ -87,14 +87,14 @@ export default function FoodCard({ foodItem, onSwipe, isTop = false }: FoodCardP
   const handleButtonAction = (action: SwipeAction) => {
     setIsExiting(true)
     
-    // Smooth button-triggered animations
+    // Even slower button-triggered animations
     if (action === 'like') {
       controls.start({
         x: 500,
         rotate: 30,
         opacity: 0,
         scale: 0.8,
-        transition: { type: 'spring', stiffness: 300, damping: 25, duration: 0.4 }
+        transition: { type: 'spring', stiffness: 80, damping: 25, duration: 2.2 }
       })
     } else if (action === 'dislike') {
       controls.start({
@@ -102,7 +102,7 @@ export default function FoodCard({ foodItem, onSwipe, isTop = false }: FoodCardP
         rotate: -30,
         opacity: 0,
         scale: 0.8,
-        transition: { type: 'spring', stiffness: 300, damping: 25, duration: 0.4 }
+        transition: { type: 'spring', stiffness: 80, damping: 25, duration: 2.2 }
       })
     } else if (action === 'superlike') {
       controls.start({
@@ -110,17 +110,17 @@ export default function FoodCard({ foodItem, onSwipe, isTop = false }: FoodCardP
         rotate: 0,
         opacity: 0,
         scale: 1.2,
-        transition: { type: 'spring', stiffness: 300, damping: 25, duration: 0.4 }
+        transition: { type: 'spring', stiffness: 80, damping: 25, duration: 2.2 }
       })
     }
     
-    setTimeout(() => onSwipe(action), 350)
+    setTimeout(() => onSwipe(action), 500)
   }
 
   return (
     <motion.div
       ref={constraintsRef}
-      className={`absolute inset-0 ${isTop ? 'z-20' : 'z-10'} flex flex-col justify-center items-center`}
+      className={`absolute inset-0 ${isTop ? 'z-20' : 'z-10'} flex flex-col justify-center items-center cursor-grab`}
       style={{ x, y, rotate, opacity }}
       animate={controls}
       drag={!isExiting}
@@ -240,7 +240,7 @@ export default function FoodCard({ foodItem, onSwipe, isTop = false }: FoodCardP
             {/* Action Buttons */}
             <div className="flex justify-center gap-8 mt-auto">
               <motion.button
-                whileHover={{ scale: 1.1 }}
+                // whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
                 transition={{ type: "spring", stiffness: 300, damping: 20 }}
                 onClick={() => handleButtonAction('dislike')}
@@ -251,7 +251,7 @@ export default function FoodCard({ foodItem, onSwipe, isTop = false }: FoodCardP
               </motion.button>
               
               <motion.button
-                whileHover={{ scale: 1.1 }}
+                // whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
                 onClick={() => handleButtonAction('like')}
                 disabled={!foodItem.isAvailable}

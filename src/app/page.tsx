@@ -157,7 +157,7 @@ export default function Home() {
                   whileFocus={{ scale: 1.02 }} 
                   transition={{ duration: 0.3, ease: "easeOut" }}
                 >
-                  <Search className="absolute left-8 top-1/2 transform -translate-y-1/2 text-muted-foreground h-8 w-8 z-10" />
+                  {/* <Search className="absolute left-8 top-1/2 transform -translate-y-1/2 text-muted-foreground h-8 w-8 z-10" /> */}
                   <Input
                     type="text"
                     value={query}
@@ -165,28 +165,25 @@ export default function Home() {
                     onFocus={() => setIsFocused(true)}
                     onBlur={() => setIsFocused(false)}
                     placeholder={isFocused ? "" : "Chinese lamb with a dash of sechuan sauce"}
-                    className="h-24 pl-20 pr-52 text-9xl text-center rounded-full border-4 focus:border-primary/30 shadow-2xl hover:shadow-3xl transition-all duration-300 bg-background/95 backdrop-blur-lg font-medium placeholder:text-muted-foreground/60"
+                    className="h-24 pl-20 pr-20 text-9xl text-center rounded-full border-4 focus:border-primary/30 shadow-2xl hover:shadow-3xl transition-all duration-300 bg-background/95 backdrop-blur-lg font-medium placeholder:text-muted-foreground/60"
                   />
-                  <div className="absolute right-6 top-1/2 transform -translate-y-1/2">
-                    <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                      <Button 
-                        type="submit"
-                        size="lg"
-                        disabled={!query.trim() || isSearching}
-                        className="h-12 px-8 text-lg font-semibold rounded-full shadow-lg"
-                      >
-                        {isSearching ? (
-                          <motion.div
-                            animate={{ rotate: 360 }}
-                            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                            className="w-6 h-6 border-2 border-current border-t-transparent rounded-full"
-                          />
-                        ) : (
-                          'Find Recipes'
-                        )}
-                      </Button>
-                    </motion.div>
-                  </div>
+                  <motion.button
+                    type="submit"
+                    disabled={!query.trim() || isSearching}
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    className="absolute right-6 top-1/2 transform -translate-y-1/2 p-3 rounded-full bg-primary hover:bg-primary/90 disabled:bg-muted disabled:cursor-not-allowed transition-colors duration-200 shadow-lg hover:shadow-xl"
+                  >
+                    {isSearching ? (
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                        className="w-6 h-6 border-2 border-white border-t-transparent rounded-full"
+                      />
+                    ) : (
+                      <Search className="h-6 w-6 text-white" />
+                    )}
+                  </motion.button>
                 </motion.div>
               </div>
               

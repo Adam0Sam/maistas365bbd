@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import FoodCard from './FoodCard'
 import { Button } from '@/components/ui/button'
-import { RotateCcw, ShoppingCart } from 'lucide-react'
+import { RotateCcw, Check } from 'lucide-react'
 import { FoodItem, SwipeAction, SwipeResult } from '@/types/food'
 
 interface FoodSwiperProps {
@@ -93,12 +93,12 @@ export default function FoodSwiper({ foodItems, onComplete, onBack }: FoodSwiper
 
       {/* Header */}
       <div className="p-4 border-b border-border flex justify-between items-center bg-background/80 backdrop-blur-lg z-50">
-        <Button variant="outline" onClick={onBack}>
+        <Button variant="secondary" size="sm" onClick={onBack} className="shadow-md hover:shadow-lg transition-all duration-200">
           <RotateCcw className="h-4 w-4 mr-2" />
           Back to Search
         </Button>
         
-        <div className="text-center">
+        <div className="text-center flex-1 mx-4">
           <div className="text-lg font-semibold">
             {currentIndex + 1} / {foodItems.length}
           </div>
@@ -107,9 +107,9 @@ export default function FoodSwiper({ foodItems, onComplete, onBack }: FoodSwiper
           </div>
         </div>
 
-        <Button variant="outline" onClick={() => onComplete(swipeResults)}>
-          <ShoppingCart className="h-4 w-4 mr-2" />
-          Cart ({likedItems.length})
+        <Button variant="default" size="sm" onClick={() => onComplete(swipeResults)} className="shadow-md hover:shadow-lg transition-all duration-200">
+          <Check className="h-4 w-4 mr-2" />
+          Done ({likedItems.length})
         </Button>
       </div>
 
