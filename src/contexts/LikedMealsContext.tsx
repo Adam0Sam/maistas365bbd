@@ -93,6 +93,8 @@ export function LikedMealsProvider({ children }: { children: ReactNode }) {
   }
 
   const getLikedMealById = (mealId: string) => {
+    console.log("liked meals: ", likedMeals)
+    console.log("liked meal id: ", mealId)
     return likedMeals.find(meal => meal.id === mealId)
   }
 
@@ -107,6 +109,7 @@ export function LikedMealsProvider({ children }: { children: ReactNode }) {
     getUncompletedMeals,
     getCompletedMeals,
     getLikedMealById,
+    isLoading
   }
 
   return (

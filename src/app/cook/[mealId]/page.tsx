@@ -6,7 +6,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, ChefHat, Check, ShoppingCart, Clock, Users, Star, ChevronRight, X, CheckCircle2, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { RecipeModal } from "@/components/RecipeModal";
 import { ShoppingModal } from "@/components/ShoppingModal";
 import { useLikedMeals } from "@/contexts/LikedMealsContext";
 import { FoodItem } from "@/types/food";
@@ -26,7 +25,6 @@ export default function CookPage() {
   const [error, setError] = useState<string | null>(null);
   const [showIngredientsModal, setShowIngredientsModal] = useState(false);
   const [selectedIngredients, setSelectedIngredients] = useState<Set<number>>(new Set());
-  const [showCookingModal, setShowCookingModal] = useState(false);
   const [shoppingList, setShoppingList] = useState<ShoppingList | null>(null);
   const [showShoppingModal, setShowShoppingModal] = useState(false);
   const [userLocation, setUserLocation] = useState<{lat: number; lng: number} | null>(null);
@@ -377,7 +375,9 @@ export default function CookPage() {
     if (missingCount === 0) {
       console.log('All ingredients available, starting cooking');
       setShowIngredientsModal(false);
-      setShowCookingModal(true);
+      // Navigate to steps page instead of showing modal
+      const rawMealId = params?.mealId as string || '';
+      router.push(`/cook/${rawMealId}/steps`);
       return;
     }
 
@@ -415,9 +415,10 @@ export default function CookPage() {
       setShowShoppingModal(true);
     } catch (error) {
       console.error('Error generating shopping list:', error);
-      // Fallback to cooking modal if shopping list generation fails
+      // Fallback to steps page if shopping list generation fails
       setShowIngredientsModal(false);
-      setShowCookingModal(true);
+      const rawMealId = params?.mealId as string || '';
+      router.push(`/cook/${rawMealId}/steps`);
     } finally {
       setIsGeneratingShoppingList(false);
     }
@@ -425,7 +426,12 @@ export default function CookPage() {
 
   const handleShoppingComplete = () => {
     setShowShoppingModal(false);
-    setShowCookingModal(true);
+    // Navigate to steps page instead of showing modal
+    const rawMealId = params.mealId as string;
+    console.log("Cook page - Navigating with raw meal ID:", rawMealId);
+    console.log("Cook page - Current meal found:", meal?.id);
+    // Use the raw meal ID directly since Next.js handles the encoding in the route
+    router.push(`/cook/${rawMealId}/steps`);
   };
 
   const handleLocationPermissionAccept = async () => {
@@ -714,17 +720,7 @@ export default function CookPage() {
         )}
       </AnimatePresence>
 
-      {/* Cooking Modal */}
-      <AnimatePresence>
-        {showCookingModal && (
-          <RecipeModal
-            recipe={recipe}
-            graph={graph}
-            isOpen={true}
-            onClose={handleBack}
-          />
-        )}
-      </AnimatePresence>
+      {/* Cooking Modal - Removed as we now navigate to steps page */}
     </div>
   );
 }

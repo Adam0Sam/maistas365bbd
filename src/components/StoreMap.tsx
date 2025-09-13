@@ -18,6 +18,7 @@ interface StoreMapProps {
   onStoreSelect: (store: StoreShoppingList) => void;
   selectedStore: StoreShoppingList | null;
   onStoreHover: (store: StoreShoppingList | null) => void;
+  onStartCooking: () => void;
 }
 
 // Custom map setup component
@@ -45,6 +46,8 @@ interface StoreMarkerProps {
   onClick: () => void;
   onMouseEnter: () => void;
   onMouseLeave: () => void;
+  onStoreSelect: (store: StoreShoppingList) => void;
+  onStartCooking: () => void;
 }
 
 function StoreMarker({ 
@@ -53,7 +56,9 @@ function StoreMarker({
   isHovered,
   onClick, 
   onMouseEnter, 
-  onMouseLeave 
+  onMouseLeave,
+  onStoreSelect,
+  onStartCooking
 }: StoreMarkerProps) {
   const getPriceLevel = (level: string) => {
     switch (level) {
@@ -118,14 +123,20 @@ function StoreMarker({
       }}
     >
       <Popup closeButton={false} className="store-popup">
-        <StorePopupContent store={store} />
+        <StorePopupContent store={store} onStartCooking={onStartCooking} />
       </Popup>
     </Marker>
   );
 }
 
 // Popup content component
-function StorePopupContent({ store }: { store: StoreShoppingList }) {
+function StorePopupContent({ 
+  store, 
+  onStartCooking 
+}: { 
+  store: StoreShoppingList;
+  onStartCooking: () => void;
+}) {
   return (
     <div className="p-3 min-w-[250px]">
       <div className="flex items-start justify-between mb-3">
@@ -187,6 +198,7 @@ function StorePopupContent({ store }: { store: StoreShoppingList }) {
         style={{ 
           background: 'linear-gradient(90deg, #3d8059 0%, #5469a4 100%)'
         }}
+        onClick={onStartCooking}
       >
         <ShoppingCart className="h-4 w-4 mr-2" />
         Select This Store
@@ -199,7 +211,8 @@ export function StoreMap({
   shoppingList, 
   onStoreSelect, 
   selectedStore,
-  onStoreHover 
+  onStoreHover,
+  onStartCooking
 }: StoreMapProps) {
   const [hoveredStore, setHoveredStore] = useState<StoreShoppingList | null>(null);
   const [isClient, setIsClient] = useState(false);
@@ -280,6 +293,8 @@ export function StoreMap({
             onClick={() => onStoreSelect(store)}
             onMouseEnter={() => handleStoreHover(store)}
             onMouseLeave={() => handleStoreHover(null)}
+            onStoreSelect={onStoreSelect}
+            onStartCooking={onStartCooking}
           />
         ))}
       </MapContainer>

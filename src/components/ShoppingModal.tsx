@@ -245,6 +245,7 @@ export function ShoppingModal({
                   onStoreSelect={handleStoreSelect}
                   selectedStore={selectedStore}
                   onStoreHover={setHoveredStore}
+                  onStartCooking={onStartCooking}
                 />
               )}
 
