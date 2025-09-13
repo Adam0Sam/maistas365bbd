@@ -45,7 +45,7 @@ export async function planRecipe({
 }) {
    // 1) Extract ingredients
    const extract = await openai.chat.completions.parse({
-      model: "gpt-4o-mini",
+      model: "gpt-5-mini-2025-08-07",
       messages: [
          {
             role: "system",
@@ -79,7 +79,7 @@ export async function planRecipe({
 
    // 3) Select shopping list
    const select = await openai.chat.completions.parse({
-      model: "gpt-4o-mini",
+      model: "gpt-5-mini-2025-08-07",
       messages: [
          {
             role: "system",
