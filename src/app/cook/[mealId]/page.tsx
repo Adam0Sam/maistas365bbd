@@ -7,9 +7,12 @@ import { ArrowLeft, ChefHat, Check, ShoppingCart, Clock, Users, Star, ChevronRig
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { RecipeModal } from "@/components/RecipeModal";
+import { ShoppingModal } from "@/components/ShoppingModal";
 import { useLikedMeals } from "@/contexts/LikedMealsContext";
 import { FoodItem } from "@/types/food";
 import { ParsedRecipe, StepGraph } from "@/lib/parse-full-recipe";
+import { ShoppingList } from "@/types/shopping";
+import { ShoppingService } from "@/services/shopping";
 
 export default function CookPage() {
   const params = useParams();
@@ -23,6 +26,13 @@ export default function CookPage() {
   const [showIngredientsModal, setShowIngredientsModal] = useState(false);
   const [selectedIngredients, setSelectedIngredients] = useState<Set<number>>(new Set());
   const [showCookingModal, setShowCookingModal] = useState(false);
+  const [shoppingList, setShoppingList] = useState<ShoppingList | null>(null);
+  const [showShoppingModal, setShowShoppingModal] = useState(false);
+  const [userLocation, setUserLocation] = useState<{lat: number; lng: number} | null>(null);
+  const [isGeneratingShoppingList, setIsGeneratingShoppingList] = useState(false);
+  const [locationPermission, setLocationPermission] = useState<'prompt' | 'granted' | 'denied' | 'unavailable'>('prompt');
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
+  const [showLocationPermissionModal, setShowLocationPermissionModal] = useState(false);
 
   useEffect(() => {
     const encodedMealId = params.mealId as string;
@@ -56,52 +66,114 @@ export default function CookPage() {
 
     // Convert FoodItem data to ParsedRecipe format
     if (foundMeal.recipeData) {
-      // Full recipe data with ingredients
-      const convertedRecipe: ParsedRecipe = {
-        info: {
-          title: foundMeal.recipeData.generated.title || foundMeal.name,
-          description: foundMeal.recipeData.generated.description,
-          servings: foundMeal.recipeData.generated.servings,
-          prep_minutes: 10, // Default values since they're not in the stored data
-          cook_minutes: 20,
-          total_minutes: 30,
-          difficulty: "medium" as const
-        },
-        ingredients: foundMeal.recipeData.generated.ingredients.map((ing, index) => ({
-          name: ing.name,
-          quantity: ing.quantity,
-          unit: "",
-          quantity_value: 1,
-          core: index < 3 // Mark first 3 as core ingredients
-        })),
-        steps: foundMeal.recipeData.generated.instructions.map((instruction, index) => ({
-          instruction,
-          number: index + 1
-        }))
-      };
+      // Check if it's the new format with generated and plan
+      if ('generated' in foundMeal.recipeData && 'plan' in foundMeal.recipeData) {
+        // New format with full recipe data
+        const { generated } = foundMeal.recipeData;
+        const convertedRecipe: ParsedRecipe = {
+          info: {
+            title: generated.title || foundMeal.name,
+            description: generated.description,
+            servings: generated.servings,
+            prep_minutes: generated.prep_time_minutes || 10,
+            cook_minutes: generated.cook_time_minutes || 20,
+            total_minutes: generated.total_time_minutes || 30,
+            difficulty: "medium" as const
+          },
+          ingredients: generated.ingredients.map((ing, index) => ({
+            name: ing.name,
+            quantity: ing.quantity,
+            unit: "",
+            quantity_value: 1,
+            core: index < 3 // Mark first 3 as core ingredients
+          })),
+          steps: generated.instructions.map((instruction, index) => ({
+            instruction,
+            number: index + 1
+          }))
+        };
 
-      // Create a basic graph structure if we have the recipeData
-      const basicGraph: StepGraph = {
-        tracks: [
-          {
-            track_id: "main",
-            title: foundMeal.name,
-            emoji: "🍽️",
-            steps: foundMeal.recipeData.generated.instructions.map((instruction, index) => ({
-              step_id: `step_${index + 1}`,
-              number: index + 1,
-              instruction,
-              duration_minutes: instruction.includes("cook") || instruction.includes("bake") ? 
-                Math.floor(Math.random() * 10) + 5 : null
-            }))
-          }
-        ],
-        joins: [],
-        warnings: []
-      };
+        // Create a basic graph structure
+        const basicGraph: StepGraph = {
+          tracks: [
+            {
+              track_id: "main",
+              title: foundMeal.name,
+              emoji: "🍽️",
+              steps: generated.instructions.map((instruction, index) => ({
+                step_id: `step_${index + 1}`,
+                number: index + 1,
+                instruction,
+                duration_minutes: instruction.includes("cook") || instruction.includes("bake") ? 
+                  Math.floor(Math.random() * 10) + 5 : null
+              }))
+            }
+          ],
+          joins: [],
+          warnings: []
+        };
 
-      setRecipe(convertedRecipe);
-      setGraph(basicGraph);
+        setRecipe(convertedRecipe);
+        setGraph(basicGraph);
+      } else {
+        // Handle old format where recipeData is directly the generated recipe
+        const generated = foundMeal.recipeData as {
+          title?: string;
+          description?: string;
+          servings?: number;
+          ingredients?: Array<{name: string; quantity: string}>;
+          instructions?: string[];
+          total_time_minutes?: number;
+          cook_time_minutes?: number;
+          prep_time_minutes?: number;
+        };
+
+        const convertedRecipe: ParsedRecipe = {
+          info: {
+            title: generated.title || foundMeal.name,
+            description: generated.description || `A delicious ${foundMeal.name} recipe`,
+            servings: generated.servings || 4,
+            prep_minutes: generated.prep_time_minutes || 10,
+            cook_minutes: generated.cook_time_minutes || 20,
+            total_minutes: generated.total_time_minutes || 30,
+            difficulty: "medium" as const
+          },
+          ingredients: (generated.ingredients || []).map((ing, index) => ({
+            name: ing.name,
+            quantity: ing.quantity,
+            unit: "",
+            quantity_value: 1,
+            core: index < 3 // Mark first 3 as core ingredients
+          })),
+          steps: (generated.instructions || []).map((instruction, index) => ({
+            instruction,
+            number: index + 1
+          }))
+        };
+
+        // Create a basic graph structure
+        const basicGraph: StepGraph = {
+          tracks: [
+            {
+              track_id: "main",
+              title: foundMeal.name,
+              emoji: "🍽️",
+              steps: (generated.instructions || []).map((instruction, index) => ({
+                step_id: `step_${index + 1}`,
+                number: index + 1,
+                instruction,
+                duration_minutes: instruction.includes("cook") || instruction.includes("bake") ? 
+                  Math.floor(Math.random() * 10) + 5 : null
+              }))
+            }
+          ],
+          joins: [],
+          warnings: []
+        };
+
+        setRecipe(convertedRecipe);
+        setGraph(basicGraph);
+      }
     } else if (foundMeal.basicRecipe) {
       // Basic recipe data without ingredients - ingredients will be loaded separately
       const convertedRecipe: ParsedRecipe = {
@@ -175,6 +247,102 @@ export default function CookPage() {
     setIsLoading(false);
   }, [params.mealId, getLikedMealById, likedMeals]);
 
+  // Check geolocation permission status
+  useEffect(() => {
+    const checkLocationPermission = async () => {
+      if (!navigator.geolocation) {
+        console.warn('Geolocation not supported');
+        setLocationPermission('unavailable');
+        setUserLocation({ lat: 54.8985, lng: 23.9036 }); // Kaunas, Lithuania
+        return;
+      }
+
+      // Check if permissions API is available
+      if (navigator.permissions) {
+        try {
+          const result = await navigator.permissions.query({ name: 'geolocation' });
+          setLocationPermission(result.state);
+          
+          if (result.state === 'granted') {
+            requestLocation();
+          } else if (result.state === 'denied') {
+            // Use fallback location if denied
+            setUserLocation({ lat: 54.8985, lng: 23.9036 });
+          }
+          // If prompt, we'll show the permission modal when shopping is initiated
+        } catch (error) {
+          console.warn('Permissions API not available, will request on demand');
+          setLocationPermission('prompt');
+        }
+      } else {
+        // Permissions API not supported, will request on demand
+        setLocationPermission('prompt');
+      }
+    };
+
+    checkLocationPermission();
+  }, []);
+
+  const requestLocation = async () => {
+    if (!navigator.geolocation) return;
+
+    setIsGettingLocation(true);
+    
+    // Use high accuracy options for precise location
+    const options = {
+      enableHighAccuracy: true, // Use GPS when available
+      timeout: 10000, // 10 seconds timeout
+      maximumAge: 300000 // Cache for 5 minutes
+    };
+
+    try {
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, options);
+      });
+
+      const { latitude, longitude, accuracy } = position.coords;
+      console.log(`📍 Location acquired: ${latitude}, ${longitude} (accuracy: ${accuracy}m)`);
+      
+      setUserLocation({
+        lat: latitude,
+        lng: longitude
+      });
+      setLocationPermission('granted');
+    } catch (error: any) {
+      console.error('Error getting precise location:', error);
+      
+      if (error.code === error.PERMISSION_DENIED) {
+        setLocationPermission('denied');
+        setUserLocation({ lat: 54.8985, lng: 23.9036 });
+      } else {
+        // Try again with lower accuracy as fallback
+        try {
+          const fallbackPosition = await new Promise<GeolocationPosition>((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, {
+              enableHighAccuracy: false,
+              timeout: 5000,
+              maximumAge: 600000 // 10 minutes cache for fallback
+            });
+          });
+
+          const { latitude, longitude } = fallbackPosition.coords;
+          console.log(`📍 Fallback location acquired: ${latitude}, ${longitude}`);
+          
+          setUserLocation({
+            lat: latitude,
+            lng: longitude
+          });
+          setLocationPermission('granted');
+        } catch (fallbackError) {
+          console.error('Fallback location also failed:', fallbackError);
+          setUserLocation({ lat: 54.8985, lng: 23.9036 });
+        }
+      }
+    } finally {
+      setIsGettingLocation(false);
+    }
+  };
+
   const handleBack = () => {
     router.back();
   };
@@ -191,13 +359,90 @@ export default function CookPage() {
     });
   };
 
-  const handleStartCooking = () => {
-    setShowIngredientsModal(false);
+  const handleStartCooking = async () => {
+    console.log('handleStartCooking called', { recipe: !!recipe, userLocation, selectedIngredients: Array.from(selectedIngredients) });
+    
+    if (!recipe) {
+      console.error('No recipe available');
+      return;
+    }
+
+    const missingCount = getTotalCount() - getSelectedCount();
+    console.log('Missing ingredients count:', missingCount);
+    
+    // If user has all ingredients, start cooking directly
+    if (missingCount === 0) {
+      console.log('All ingredients available, starting cooking');
+      setShowIngredientsModal(false);
+      setShowCookingModal(true);
+      return;
+    }
+
+    // Check if we need to request location permission
+    if (locationPermission === 'prompt' && !userLocation) {
+      setShowLocationPermissionModal(true);
+      return;
+    }
+
+    // If user is missing ingredients, generate shopping list
+    setIsGeneratingShoppingList(true);
+    
+    try {
+      const missingIngredients = recipe.ingredients
+        .filter((_, index) => !selectedIngredients.has(index))
+        .map(ingredient => ingredient.name);
+
+      console.log('Missing ingredients:', missingIngredients);
+
+      const shoppingService = ShoppingService.getInstance();
+      const currentLocation = userLocation || { lat: 54.8985, lng: 23.9036 }; // Kaunas fallback
+      
+      console.log('Generating shopping list...');
+      const generatedShoppingList = await shoppingService.generateShoppingList(
+        meal?.id || 'unknown',
+        recipe.info.title,
+        missingIngredients,
+        currentLocation,
+        recipe
+      );
+
+      console.log('Shopping list generated:', generatedShoppingList);
+      setShoppingList(generatedShoppingList);
+      setShowIngredientsModal(false);
+      setShowShoppingModal(true);
+    } catch (error) {
+      console.error('Error generating shopping list:', error);
+      // Fallback to cooking modal if shopping list generation fails
+      setShowIngredientsModal(false);
+      setShowCookingModal(true);
+    } finally {
+      setIsGeneratingShoppingList(false);
+    }
+  };
+
+  const handleShoppingComplete = () => {
+    setShowShoppingModal(false);
     setShowCookingModal(true);
+  };
+
+  const handleLocationPermissionAccept = async () => {
+    setShowLocationPermissionModal(false);
+    await requestLocation();
+    // After getting location, continue with shopping list generation
+    setTimeout(() => handleStartCooking(), 100);
+  };
+
+  const handleLocationPermissionDecline = () => {
+    setShowLocationPermissionModal(false);
+    setLocationPermission('denied');
+    setUserLocation({ lat: 54.8985, lng: 23.9036 }); // Kaunas fallback
+    // Continue with shopping list generation using fallback location
+    setTimeout(() => handleStartCooking(), 100);
   };
 
   const getSelectedCount = () => selectedIngredients.size;
   const getTotalCount = () => recipe?.ingredients?.length || 0;
+  const getMissingCount = () => getTotalCount() - getSelectedCount();
 
   if (isLoading) {
     return (
@@ -433,6 +678,39 @@ export default function CookPage() {
         )}
       </AnimatePresence>
 
+      {/* Location Permission Modal */}
+      <AnimatePresence>
+        {showLocationPermissionModal && (
+          <LocationPermissionModal
+            onAccept={handleLocationPermissionAccept}
+            onDecline={handleLocationPermissionDecline}
+            isGettingLocation={isGettingLocation}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Loading Modal for Shopping List Generation */}
+      <AnimatePresence>
+        {isGeneratingShoppingList && (
+          <LoadingModal
+            title="Finding Best Stores"
+            message="Searching IKI, Rimi, and Maxima for your missing ingredients..."
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Shopping Modal */}
+      <AnimatePresence>
+        {showShoppingModal && shoppingList && (
+          <ShoppingModal
+            shoppingList={shoppingList}
+            isOpen={true}
+            onClose={() => setShowShoppingModal(false)}
+            onStartCooking={handleShoppingComplete}
+          />
+        )}
+      </AnimatePresence>
+
       {/* Cooking Modal */}
       <AnimatePresence>
         {showCookingModal && (
@@ -466,6 +744,7 @@ function IngredientsModal({
 }: IngredientsModalProps) {
   const selectedCount = selectedIngredients.size;
   const totalCount = recipe.ingredients.length;
+  const missingCount = totalCount - selectedCount;
   const completionPercentage = totalCount > 0 ? (selectedCount / totalCount) * 100 : 0;
 
   return (
@@ -643,7 +922,10 @@ function IngredientsModal({
               Cancel
             </Button>
             <Button
-              onClick={onStartCooking}
+              onClick={() => {
+                console.log('Button clicked in IngredientsModal');
+                onStartCooking();
+              }}
               disabled={recipe.ingredients.length > 0 && selectedCount === 0}
               className="flex-1 h-12 text-white disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
               style={{ 
@@ -651,12 +933,195 @@ function IngredientsModal({
                 transition: 'background 0.3s ease'
               }}
             >
-              <ChefHat className="h-4 w-4 mr-2" />
-              {recipe.ingredients.length === 0 
-                ? "Start Cooking & Load Ingredients"
-                : `Start Cooking (${selectedCount})`
-              }
+              {recipe.ingredients.length === 0 ? (
+                <>
+                  <ChefHat className="h-4 w-4 mr-2" />
+                  Start Cooking & Load Ingredients
+                </>
+              ) : missingCount > 0 ? (
+                <>
+                  <ShoppingCart className="h-4 w-4 mr-2" />
+                  Get Missing Ingredients ({missingCount})
+                </>
+              ) : (
+                <>
+                  <ChefHat className="h-4 w-4 mr-2" />
+                  Start Cooking
+                </>
+              )}
             </Button>
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// Location Permission Modal Component
+interface LocationPermissionModalProps {
+  onAccept: () => void;
+  onDecline: () => void;
+  isGettingLocation: boolean;
+}
+
+function LocationPermissionModal({ onAccept, onDecline, isGettingLocation }: LocationPermissionModalProps) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+    >
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0, y: 20 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.9, opacity: 0, y: 20 }}
+        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+        className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden"
+      >
+        {/* Header */}
+        <div 
+          className="relative p-6 text-white text-center"
+          style={{ background: 'linear-gradient(90deg, #3d8059 0%, #5469a4 100%)' }}
+        >
+          <div className="text-6xl mb-4">📍</div>
+          <h2 className="text-2xl font-bold mb-2">Find Nearby Stores</h2>
+          <p className="text-white/90">
+            We'd like to use your location to find the closest IKI, Rimi, and Maxima stores
+          </p>
+        </div>
+
+        {/* Content */}
+        <div className="p-6">
+          <div className="space-y-4 mb-6">
+            <div className="flex items-start gap-3">
+              <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <Check className="h-4 w-4 text-green-600" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900">Better Prices</h3>
+                <p className="text-sm text-gray-600">Find the cheapest ingredients nearby</p>
+              </div>
+            </div>
+            
+            <div className="flex items-start gap-3">
+              <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <MapPin className="h-4 w-4 text-blue-600" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900">Accurate Distances</h3>
+                <p className="text-sm text-gray-600">See exact travel time to each store</p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <div className="w-6 h-6 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <Star className="h-4 w-4 text-purple-600" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900">Smart Recommendations</h3>
+                <p className="text-sm text-gray-600">Get personalized store suggestions</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="text-xs text-gray-500 bg-gray-50 p-3 rounded-lg mb-6">
+            <strong>Privacy:</strong> Your location is only used to find nearby stores and is not stored or shared.
+          </div>
+
+          {/* Buttons */}
+          <div className="flex gap-3">
+            <Button
+              onClick={onDecline}
+              variant="outline"
+              className="flex-1 h-12 border-gray-300 hover:border-gray-400"
+              disabled={isGettingLocation}
+            >
+              Use Default Location
+            </Button>
+            <Button
+              onClick={onAccept}
+              className="flex-1 h-12 text-white font-semibold"
+              style={{ 
+                background: 'linear-gradient(90deg, #3d8059 0%, #5469a4 100%)'
+              }}
+              disabled={isGettingLocation}
+            >
+              {isGettingLocation ? (
+                <>
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                    className="w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"
+                  />
+                  Getting Location...
+                </>
+              ) : (
+                <>
+                  <MapPin className="h-4 w-4 mr-2" />
+                  Allow Location
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// Loading Modal Component
+interface LoadingModalProps {
+  title: string;
+  message: string;
+}
+
+function LoadingModal({ title, message }: LoadingModalProps) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+    >
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0, y: 20 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.9, opacity: 0, y: 20 }}
+        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+        className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden"
+      >
+        {/* Content */}
+        <div className="p-8 text-center">
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+            className="w-16 h-16 border-4 border-t-transparent rounded-full mx-auto mb-6"
+            style={{ borderColor: '#3d8059', borderTopColor: 'transparent' }}
+          />
+          
+          <h2 className="text-2xl font-bold mb-4 text-gray-900">{title}</h2>
+          <p className="text-gray-600 mb-6">{message}</p>
+          
+          <div className="flex justify-center space-x-2">
+            <motion.div
+              animate={{ scale: [1, 1.2, 1] }}
+              transition={{ duration: 0.8, repeat: Infinity, delay: 0 }}
+              className="w-2 h-2 rounded-full"
+              style={{ backgroundColor: '#3d8059' }}
+            />
+            <motion.div
+              animate={{ scale: [1, 1.2, 1] }}
+              transition={{ duration: 0.8, repeat: Infinity, delay: 0.2 }}
+              className="w-2 h-2 rounded-full"
+              style={{ backgroundColor: '#5469a4' }}
+            />
+            <motion.div
+              animate={{ scale: [1, 1.2, 1] }}
+              transition={{ duration: 0.8, repeat: Infinity, delay: 0.4 }}
+              className="w-2 h-2 rounded-full"
+              style={{ backgroundColor: '#3d8059' }}
+            />
           </div>
         </div>
       </motion.div>
