@@ -3,11 +3,13 @@
 
 import { FoodMealModal } from "@/components/food-card/FoodCardModal";
 import { GridMealCard } from "@/components/MealCard";
+import { RecipeModal } from "@/components/RecipeModal";
 import {
   ParsedRecipe,
   StepGraph,
   GraphTrack,
   GraphJoin,
+  GraphSimpleStep,
 } from "@/lib/parse-full-recipe";
 import { useEffect, useState } from "react";
 
@@ -496,7 +498,7 @@ export default function TestPageComponent() {
                     number: 4,
                     instruction:
                       "Fry the chicken in the oiled pan for 3-4 mins on each side until they are cooked through.",
-                    duration_minutes: null,
+                    duration_minutes: 4,
                   },
                   {
                     step_id: "s5",
@@ -523,7 +525,7 @@ export default function TestPageComponent() {
                     number: 8,
                     instruction:
                       "Add the chicken to the air-fryer and cook for 12 mins.",
-                    duration_minutes: null,
+                    duration_minutes: 12,
                   },
                   {
                     step_id: "s9",
@@ -590,7 +592,7 @@ export default function TestPageComponent() {
                     number: 2,
                     instruction:
                       "Add the halloumi to the air fryer basket and cook for 10 mins, turning halfway through, until it's golden.",
-                    duration_minutes: null,
+                    duration_minutes: 10,
                   },
                 ],
               },
@@ -676,95 +678,20 @@ export default function TestPageComponent() {
           </div>
         </div>
 
-        <div className="grid lg:grid-cols-2 gap-8">
-          <div>
-            <h2 className="text-xl font-semibold mb-4">Ingredients</h2>
-            <div className="space-y-2">
-              {recipe.ingredients.map((ing, i) => (
-                <div
-                  key={i}
-                  className="flex justify-between p-3 bg-gray-50 rounded"
-                >
-                  <span className="font-medium">{ing.name}</span>
-                  <span className="text-gray-600">{ing.quantity}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <h2 className="text-xl font-semibold mb-4">Instructions</h2>
-            {graph && graph.tracks ? (
-              <div className="space-y-6">
-                {graph.tracks.map((track) => (
-                  <div key={track.track_id} className="border rounded-lg p-4">
-                    <h3 className="font-semibold text-lg mb-3">
-                      {track.emoji} {track.title}
-                    </h3>
-                    <div className="space-y-3">
-                      {track.steps.map((step) => (
-                        <div key={step.step_id} className="flex gap-3">
-                          <div className="flex-shrink-0 w-8 h-8 bg-blue-100 text-blue-800 rounded-full flex items-center justify-center font-semibold text-sm">
-                            {step.number}
-                          </div>
-                          <div>
-                            <p className="text-gray-800">{step.instruction}</p>
-                            {step.duration_minutes && (
-                              <p className="text-sm text-gray-500 mt-1">
-                                ⏱️ {step.duration_minutes} min
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-
-                {graph.joins && graph.joins.length > 0 && (
-                  <div className="border rounded-lg p-4 bg-yellow-50">
-                    <h3 className="font-semibold text-lg mb-3">
-                      🔄 Final Assembly
-                    </h3>
-                    <div className="space-y-3">
-                      {graph.joins.map((join) => (
-                        <div key={join.step_id} className="flex gap-3">
-                          <div className="flex-shrink-0 w-8 h-8 bg-yellow-100 text-yellow-800 rounded-full flex items-center justify-center font-semibold text-sm">
-                            ⚡
-                          </div>
-                          <p className="text-gray-800">{join.instruction}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {recipe.steps.map((step) => (
-                  <div key={step.number} className="flex gap-3">
-                    <div className="flex-shrink-0 w-8 h-8 bg-blue-100 text-blue-800 rounded-full flex items-center justify-center font-semibold text-sm">
-                      {step.number}
-                    </div>
-                    <p className="text-gray-800">{step.instruction}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
+        <button
+          onClick={() => setOpen(true)}
+          className="w-full max-w-md mx-auto bg-blue-600 text-white py-4 px-6 rounded-lg font-semibold text-lg hover:bg-blue-700 transition-colors"
+        >
+          Start Cooking
+        </button>
       </div>
 
-      {open && recipe && (
-        <FoodMealModal
-          recipe={recipe}
-          onClose={() => setOpen(false)}
-          onRemove={() => {
-            setOpen(false);
-            setRecipe(null);
-          }}
-        />
-      )}
+      <RecipeModal
+        recipe={recipe}
+        graph={graph}
+        isOpen={open}
+        onClose={() => setOpen(false)}
+      />
     </div>
   );
 }
