@@ -27,13 +27,9 @@ export type GeneratedRecipesResponse = z.infer<
 >;
 
 export type BatchPlanInput = {
-   /** hard-require; used in both the selection step and to guide generation (style, budget, stores, dietary, etc.) */
    requirements: string;
-   /** optional guidance to steer themes/cuisines/time/macros/etc. */
    prompt?: string;
-   /** extra fields to request from Weaviate */
    fields?: string[];
-   /** Weaviate candidate limit per ingredient */
    limit?: number;
 };
 
@@ -59,7 +55,7 @@ export async function generateAndPlanRecipes({
 }: BatchPlanInput): Promise<PlannedRecipeResult[]> {
    // 1) Generate 6 recipes in strict JSON
    const gen = await openai.chat.completions.parse({
-      model: "gpt-4o-mini",
+      model: "gpt-5-mini-2025-08-07",
       messages: [
          {
             role: "system",
