@@ -11,6 +11,7 @@
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.3",
     "@types/leaflet": "^1.9.20",
+    "apify-client": "^2.17.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "env": "^0.0.2",
