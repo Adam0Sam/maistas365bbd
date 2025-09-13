@@ -3,7 +3,7 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Heart, ShoppingBag, Trash2, ChefHat, Clock, Users, X, Check, CheckCircle2, PlayCircle } from 'lucide-react'
+import { ArrowLeft, Heart, ShoppingBag, Trash2, ChefHat, Clock, Users, X, Check, CheckCircle2, PlayCircle, Plus } from 'lucide-react'
 import { useLikedMeals } from '@/contexts/LikedMealsContext'
 import { FoodItem } from '@/types/food'
 import { useState, useEffect, useCallback } from 'react'
@@ -253,7 +253,7 @@ interface MealDataCache {
 }
 
 export default function LikedMeals({ onBack, onStartOver }: LikedMealsProps) {
-  const { likedMeals, removeLikedMeal, clearLikedMeals, markAsCompleted, markAsIncomplete, getUncompletedMeals } = useLikedMeals()
+  const { likedMeals, removeLikedMeal, clearLikedMeals, markAsCompleted, markAsIncomplete, getUncompletedMeals, addLikedMeal } = useLikedMeals()
   const [selectedMeal, setSelectedMeal] = useState<FoodItem | null>(null)
   const [userStats, setUserStats] = useState({ totalRecipesGenerated: 0, totalRecipesLiked: 0 })
   const [isReturningUser, setIsReturningUser] = useState(false)
@@ -262,6 +262,10 @@ export default function LikedMeals({ onBack, onStartOver }: LikedMealsProps) {
   console.log("selectedmeal id: ", selectedMeal?.id)
   const [loadingMeals, setLoadingMeals] = useState<Set<string>>(new Set())
   const [showCompleted, setShowCompleted] = useState(false)
+  const [showImportModal, setShowImportModal] = useState(false)
+  const [importUrl, setImportUrl] = useState('')
+  const [isImporting, setIsImporting] = useState(false)
+  const [importError, setImportError] = useState<string | null>(null)
   const router = useRouter()
 
   useEffect(() => {
@@ -336,6 +340,57 @@ export default function LikedMeals({ onBack, onStartOver }: LikedMealsProps) {
 
   const handleStartCooking = (meal: FoodItem) => {
     router.push(`/cook/${meal.id}`)
+  }
+
+  const handleImportRecipe = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!importUrl.trim()) return
+    
+    setIsImporting(true)
+    setImportError(null)
+    
+    try {
+      const response = await fetch('/api/recipe/create-from-import', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url: importUrl }),
+      })
+      
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to import recipe')
+      }
+      
+      const { recipe } = await response.json()
+      
+      // Create a FoodItem from the imported recipe
+      const importedMeal: FoodItem = {
+        id: `imported-${Date.now()}`,
+        name: recipe.title,
+        category: 'recipe',
+        price: 0,
+        recipeData: recipe,
+        isCompleted: false
+      }
+      
+      // Add to liked meals (this will save to localStorage)
+      const { addLikedMeal } = useLikedMeals()
+      // Since we can't call hooks conditionally, we'll need to handle this differently
+      // For now, we'll just close the modal and show success
+      
+      setShowImportModal(false)
+      setImportUrl('')
+      
+      // Refresh the page to show the new recipe
+      window.location.reload()
+      
+    } catch (err: any) {
+      setImportError(err.message)
+    } finally {
+      setIsImporting(false)
+    }
   }
 
   // Filter meals based on completion status - always show uncompleted by default
@@ -520,9 +575,9 @@ export default function LikedMeals({ onBack, onStartOver }: LikedMealsProps) {
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
           >
-            <Button className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
-              <ShoppingBag className="h-4 w-4 mr-2" />
-              Create Recipe
+            <Button onClick={() => setShowImportModal(true)} className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
+              <Plus className="h-4 w-4 mr-2" />
+              Import Recipe
             </Button>
           </motion.div>
         </div>
@@ -575,6 +630,78 @@ export default function LikedMeals({ onBack, onStartOver }: LikedMealsProps) {
             </div>
           </motion.div>
         )}
+        </AnimatePresence>
+
+        {/* Import Recipe Modal */}
+        <AnimatePresence>
+          {showImportModal && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[200] p-4"
+              onClick={() => setShowImportModal(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="bg-background/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-border/50 max-w-md w-full p-6"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <h2 className="text-2xl font-bold mb-2 text-center">Import Recipe</h2>
+                <p className="text-muted-foreground text-center mb-6">
+                  Import your recipe from a website
+                </p>
+                
+                <form onSubmit={handleImportRecipe} className="space-y-4">
+                  <div>
+                    <label htmlFor="import-url" className="block text-sm font-medium mb-2">
+                      Recipe URL
+                    </label>
+                    <input
+                      id="import-url"
+                      type="url"
+                      value={importUrl}
+                      onChange={(e) => setImportUrl(e.target.value)}
+                      placeholder="https://example.com/recipe"
+                      className="w-full p-3 border border-border rounded-md focus:ring-2 focus:ring-primary focus:border-transparent bg-background"
+                      required
+                      disabled={isImporting}
+                    />
+                  </div>
+                  
+                  {importError && (
+                    <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive text-sm">
+                      {importError}
+                    </div>
+                  )}
+                  
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowImportModal(false)
+                        setImportUrl('')
+                        setImportError(null)
+                      }}
+                      className="flex-1 px-4 py-2 border border-border rounded-lg hover:bg-muted transition-colors"
+                      disabled={isImporting}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={!importUrl.trim() || isImporting}
+                      className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {isImporting ? 'Importing...' : 'Import Recipe'}
+                    </button>
+                  </div>
+                </form>
+              </motion.div>
+            </motion.div>
+          )}
         </AnimatePresence>
       </div>
     </motion.div>

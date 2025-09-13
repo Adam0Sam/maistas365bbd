@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Input } from '@/components/ui/input'
-import { Search } from 'lucide-react'
+import { Search, Plus } from 'lucide-react'
 import RecipeSwiper from '@/components/RecipeSwiper'
 import LikedMeals from '@/components/LikedMeals'
 
@@ -25,6 +25,10 @@ function HomeContent() {
   const [generatedRecipes, setGeneratedRecipes] = useState<GeneratedRecipe[]>([])
   const [error, setError] = useState<string | null>(null)
   const [isInitialLoad, setIsInitialLoad] = useState(true)
+  const [showImportModal, setShowImportModal] = useState(false)
+  const [importUrl, setImportUrl] = useState('')
+  const [isImporting, setIsImporting] = useState(false)
+  const [importError, setImportError] = useState<string | null>(null)
 
   // Check user state on component mount
   useEffect(() => {
@@ -119,6 +123,47 @@ function HomeContent() {
     setQuery('')
     setError(null)
     // Don't clear generatedRecipes - keep them available
+  }
+
+  const handleImportRecipe = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!importUrl.trim()) return
+    
+    setIsImporting(true)
+    setImportError(null)
+    
+    try {
+      const response = await fetch('/api/recipe/create-from-import', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url: importUrl }),
+      })
+      
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to import recipe')
+      }
+      
+      const { recipe } = await response.json()
+      
+      // Add the imported recipe to the list
+      const newRecipes = [recipe]
+      saveRecipesToStorage(newRecipes)
+      setGeneratedRecipes(newRecipes)
+      
+      // Close modal and show the recipe
+      setShowImportModal(false)
+      setImportUrl('')
+      setShowSwiper(true)
+      setShowLikedMeals(false)
+      
+    } catch (err: any) {
+      setImportError(err.message)
+    } finally {
+      setIsImporting(false)
+    }
   }
 
   const fadeInUp = {
@@ -307,7 +352,18 @@ function HomeContent() {
             </div>
           </motion.form>
 
-          {/* Feature Cards - Simplified */}
+          {/* Import Recipe Button */}
+          <motion.div variants={fadeInUp} className="">
+            <motion.button
+              onClick={() => setShowImportModal(true)}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="bg-secondary/80 hover:bg-secondary text-secondary-foreground px-8 py-4 rounded-full font-medium transition-all duration-200 shadow-lg hover:shadow-xl backdrop-blur-sm border border-border/50 flex items-center gap-3 mx-auto"
+            >
+              <Plus className="h-5 w-5" />
+              Import Recipe from Website
+            </motion.button>
+          </motion.div>
           
           </motion.div>
         </motion.main>
@@ -331,6 +387,78 @@ function HomeContent() {
           onStartOver={handleStartOver}
         />
       )}
+
+      {/* Import Recipe Modal */}
+      <AnimatePresence>
+        {showImportModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            onClick={() => setShowImportModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-background/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-border/50 max-w-md w-full p-6"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h2 className="text-2xl font-bold mb-2 text-center">Import Recipe</h2>
+              <p className="text-muted-foreground text-center mb-6">
+                Import your recipe from a website
+              </p>
+              
+              <form onSubmit={handleImportRecipe} className="space-y-4">
+                <div>
+                  <label htmlFor="import-url" className="block text-sm font-medium mb-2">
+                    Recipe URL
+                  </label>
+                  <Input
+                    id="import-url"
+                    type="url"
+                    value={importUrl}
+                    onChange={(e) => setImportUrl(e.target.value)}
+                    placeholder="https://example.com/recipe"
+                    className="w-full"
+                    required
+                    disabled={isImporting}
+                  />
+                </div>
+                
+                {importError && (
+                  <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive text-sm">
+                    {importError}
+                  </div>
+                )}
+                
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowImportModal(false)
+                      setImportUrl('')
+                      setImportError(null)
+                    }}
+                    className="flex-1 px-4 py-2 border border-border rounded-lg hover:bg-muted transition-colors"
+                    disabled={isImporting}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={!importUrl.trim() || isImporting}
+                    className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {isImporting ? 'Importing...' : 'Import Recipe'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       </AnimatePresence>
     </div>
   )
