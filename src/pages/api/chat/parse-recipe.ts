@@ -11,13 +11,15 @@ export default async function handler(
       return res.status(405).json({ error: "Method not allowed" });
    }
 
-   const { recipe, requirements, fields, limit } = req.body ?? {};
+   const { recipe, requirements, fields, limit, ingredients } = req.body ?? {};
    if (!recipe) return res.status(400).json({ error: "recipe is required" });
    if (!requirements)
       return res.status(400).json({ error: "requirements are required" });
+   if (!ingredients || !Array.isArray(ingredients))
+      return res.status(400).json({ error: "ingredients array is required" });
 
    try {
-      const result = await planRecipe({ recipe, requirements, fields, limit });
+      const result = await planRecipe({ recipe, requirements, fields, limit, ingredients });
       return res.status(200).json(result);
    } catch (err: any) {
       console.error("plan error:", err);
