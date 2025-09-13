@@ -2,13 +2,13 @@
 
 import { motion, useMotionValue, useTransform, useAnimation, PanInfo } from 'framer-motion'
 import { Badge } from '@/components/ui/badge'
-import { Heart, X, ShoppingBag, DollarSign, Clock, Users } from 'lucide-react'
+import { Heart, X, ShoppingBag, Users } from 'lucide-react'
 import { SwipeAction } from '@/types/food'
-import { PlannedRecipeResult } from '@/lib/generateAndParse'
+import { GeneratedRecipe } from '@/lib/generateAndParse'
 import { useState, useRef } from 'react'
 
 interface RecipeCardProps {
-  recipe: PlannedRecipeResult & { ok: true }
+  recipe: GeneratedRecipe
   onSwipe: (action: SwipeAction) => void
   isTop?: boolean
 }
@@ -37,7 +37,7 @@ export default function RecipeCard({ recipe, onSwipe, isTop = false }: RecipeCar
     ['rgb(239, 68, 68)', 'rgb(156, 163, 175)', 'rgb(156, 163, 175)', 'rgb(34, 197, 94)', 'rgb(34, 197, 94)'])
   const borderWidth = useTransform(x, [-150, -50, 0, 50, 150], [4, 2, 2, 2, 4])
 
-  const totalCost = recipe.plan.shopping_list.reduce((sum, item) => sum + item.chosen_product.price, 0)
+  // No cost calculation in new simplified schema
 
   const handleDragEnd = (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
     const currentX = x.get()
@@ -189,35 +189,28 @@ export default function RecipeCard({ recipe, onSwipe, isTop = false }: RecipeCar
               <h3 className="text-xl font-bold text-foreground mb-2 line-clamp-2">
                 {recipe.title}
               </h3>
-              {recipe.generated.description && (
+              {recipe.description && (
                 <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
-                  {recipe.generated.description}
+                  {recipe.description}
                 </p>
               )}
             </div>
 
             {/* Recipe Stats */}
-            <div className="grid grid-cols-3 gap-2 mb-4">
-              <div className="text-center p-2 bg-muted/50 rounded-lg">
-                <div className="flex items-center justify-center gap-1 mb-1">
-                  <DollarSign className="h-3 w-3 text-success" />
-                  <span className="text-sm font-bold text-success">${totalCost.toFixed(2)}</span>
-                </div>
-                <div className="text-xs text-muted-foreground">Total Cost</div>
-              </div>
+            <div className="grid grid-cols-2 gap-2 mb-4">
               <div className="text-center p-2 bg-muted/50 rounded-lg">
                 <div className="flex items-center justify-center gap-1 mb-1">
                   <Users className="h-3 w-3 text-blue-500" />
-                  <span className="text-sm font-bold text-blue-500">{recipe.generated.servings}</span>
+                  <span className="text-sm font-bold text-blue-500">{recipe.servings}</span>
                 </div>
                 <div className="text-xs text-muted-foreground">Servings</div>
               </div>
               <div className="text-center p-2 bg-muted/50 rounded-lg">
                 <div className="flex items-center justify-center gap-1 mb-1">
                   <ShoppingBag className="h-3 w-3 text-purple-500" />
-                  <span className="text-sm font-bold text-purple-500">{recipe.plan.shopping_list.length}</span>
+                  <span className="text-sm font-bold text-purple-500">{recipe.ingredients.length}</span>
                 </div>
-                <div className="text-xs text-muted-foreground">Items</div>
+                <div className="text-xs text-muted-foreground">Ingredients</div>
               </div>
             </div>
 
@@ -225,29 +218,24 @@ export default function RecipeCard({ recipe, onSwipe, isTop = false }: RecipeCar
             <div className="mb-4">
               <h4 className="text-sm font-semibold mb-2">Key Ingredients:</h4>
               <div className="flex flex-wrap gap-1">
-                {recipe.generated.ingredients.slice(0, 4).map((ingredient, idx) => (
+                {recipe.ingredients.slice(0, 4).map((ingredient, idx) => (
                   <Badge key={idx} variant="outline" className="text-xs">
                     {ingredient.name}
                   </Badge>
                 ))}
-                {recipe.generated.ingredients.length > 4 && (
+                {recipe.ingredients.length > 4 && (
                   <Badge variant="secondary" className="text-xs">
-                    +{recipe.generated.ingredients.length - 4} more
+                    +{recipe.ingredients.length - 4} more
                   </Badge>
                 )}
               </div>
             </div>
 
-            {/* Store Distribution */}
+            {/* Cooking Steps Preview */}
             <div className="mb-6">
-              <h4 className="text-sm font-semibold mb-2">Available at:</h4>
-              <div className="flex flex-wrap gap-1">
-                {Array.from(new Set(recipe.plan.shopping_list.map(item => item.chosen_product.shop)))
-                  .slice(0, 3).map((shop, idx) => (
-                  <Badge key={idx} variant="secondary" className="text-xs">
-                    {shop}
-                  </Badge>
-                ))}
+              <h4 className="text-sm font-semibold mb-2">Steps:</h4>
+              <div className="text-xs text-muted-foreground">
+                {recipe.instructions.length} cooking steps
               </div>
             </div>
 

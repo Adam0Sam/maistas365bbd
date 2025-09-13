@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Search } from 'lucide-react'
 import RecipeSwiper from '@/components/RecipeSwiper'
 import LikedMeals from '@/components/LikedMeals'
-import type { PlannedRecipeResult } from '@/lib/generateAndParse'
+
 import { 
   saveRecipesToStorage, 
   getRecipesFromStorage,
@@ -14,6 +14,7 @@ import {
   markUserAsReturning,
   incrementRecipesGenerated
 } from '@/lib/localStorage'
+import { GeneratedRecipe } from '@/lib/generateAndParse'
 
 function HomeContent() {
   const [query, setQuery] = useState('')
@@ -21,7 +22,7 @@ function HomeContent() {
   const [isFocused, setIsFocused] = useState(false)
   const [showSwiper, setShowSwiper] = useState(false)
   const [showLikedMeals, setShowLikedMeals] = useState(false)
-  const [generatedRecipes, setGeneratedRecipes] = useState<PlannedRecipeResult[]>([])
+  const [generatedRecipes, setGeneratedRecipes] = useState<GeneratedRecipe[]>([])
   const [error, setError] = useState<string | null>(null)
   const [isInitialLoad, setIsInitialLoad] = useState(true)
 
@@ -55,9 +56,7 @@ function HomeContent() {
     setError(null)
     
     try {
-      // Add timeout with AbortController
       const controller = new AbortController()
-      // const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
       
       const response = await fetch('/api/chat/generateBatch', {
         method: 'POST',
@@ -67,40 +66,25 @@ function HomeContent() {
         body: JSON.stringify({
           requirements: query,
           prompt: 'Create diverse, practical recipes that can be prepared at home',
-          fields: ['productId', 'name', 'price', 'shop', 'available', 'image'],
-          limit: 2
+          limit: 6
         }),
         signal: controller.signal
       })
       
-      // clearTimeout(timeoutId)
-      
       if (!response.ok) {
         const errorText = await response.text().catch(() => '')
+        console.log("error", errorText)
         throw new Error(`Recipe generation failed: ${response.status} ${response.statusText}${errorText ? ` - ${errorText}` : ''}`)
       }
       
-      const results: PlannedRecipeResult[] = await response.json()
+      const recipes: GeneratedRecipe[] = await response.json()
       
-      // Filter out failed recipes and handle partial success
-      const successfulRecipes = results.filter(r => r.ok)
-      if (successfulRecipes.length === 0) {
-        throw new Error('All recipe generations failed. Please try again with different requirements.')
-      }
+      saveRecipesToStorage(recipes)
       
-      // Notify user if some recipes failed
-      if (successfulRecipes.length < results.length) {
-        const failedCount = results.length - successfulRecipes.length
-        console.warn(`${failedCount} recipe(s) failed to generate properly`)
-      }
-      // Save only successful recipes to local storage
-      saveRecipesToStorage(successfulRecipes)
-      
-      // Update user state
-      incrementRecipesGenerated(successfulRecipes.length)
+      incrementRecipesGenerated(recipes.length)
       markUserAsReturning()
       
-      setGeneratedRecipes(successfulRecipes)
+      setGeneratedRecipes(recipes)
       setShowSwiper(true)
       setShowLikedMeals(false) // Hide liked meals when showing new recipes
     } catch (err: any) {

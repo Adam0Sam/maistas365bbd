@@ -1,11 +1,10 @@
+import { GeneratedRecipe } from "@/lib/generateAndParse"
+
 export interface FoodItem {
   id: string
   name: string
-  price: number
   url: string // Links to shop website
   image: string // Image URL
-  pricePerUnit: string // e.g., "$2.50/lb", "$0.99/each"
-  shopName: string
   isAvailable: boolean
   isCompleted?: boolean // Track if meal has been cooked
   category?: string // Optional: e.g., "protein", "vegetable", "grain"
@@ -16,28 +15,7 @@ export interface FoodItem {
     fat?: number
   }
   // Full recipe data from generateBatch API (for liked recipes)
-  recipeData?: {
-    generated: {
-      title: string
-      description: string
-      servings: number
-      ingredients: Array<{ name: string; quantity: string }>
-      instructions: string[]
-    }
-    plan: {
-      ingredients: Array<{ name: string; quantity: string; search_description: string }>
-      candidates: Record<string, any[]>
-      shopping_list: Array<{
-        ingredient: string
-        chosen_product: {
-          productId: string
-          name: string
-          price: number
-          shop: string
-        }
-      }>
-    }
-  }
+  recipeData?: GeneratedRecipe
 }
 
 export interface Recipe {

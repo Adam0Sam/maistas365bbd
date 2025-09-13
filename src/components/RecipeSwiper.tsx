@@ -6,12 +6,12 @@ import RecipeCard from './RecipeCard'
 import { Button } from '@/components/ui/button'
 import { RotateCcw, Check } from 'lucide-react'
 import { SwipeAction } from '@/types/food'
-import { PlannedRecipeResult } from '@/lib/generateAndParse'
 import { useLikedMeals } from '@/contexts/LikedMealsContext'
 import { incrementRecipesLiked } from '@/lib/localStorage'
+import { GeneratedRecipe } from '@/lib/generateAndParse'
 
 interface RecipeSwiperProps {
-  recipes: PlannedRecipeResult[]
+  recipes: GeneratedRecipe[]
   onBack: () => void
   onShowLikedMeals: () => void
 }
@@ -21,10 +21,10 @@ export default function RecipeSwiper({ recipes, onBack, onShowLikedMeals }: Reci
   const { addLikedMeal, getLikedMealsCount } = useLikedMeals()
 
   // Filter successful recipes
-  const successfulRecipes = recipes.filter((recipe): recipe is PlannedRecipeResult & { ok: true } => recipe.ok)
-  const currentRecipe = successfulRecipes[currentIndex]
-  const nextRecipe = successfulRecipes[currentIndex + 1]
-  const isLastRecipe = currentIndex === successfulRecipes.length - 1
+
+  const currentRecipe = recipes[currentIndex]
+  const nextRecipe = recipes[currentIndex + 1]
+  const isLastRecipe = currentIndex === recipes.length - 1
   const likedCount = getLikedMealsCount()
 
   const handleSwipe = (action: SwipeAction) => {
@@ -35,18 +35,12 @@ export default function RecipeSwiper({ recipes, onBack, onShowLikedMeals }: Reci
       const recipeAsFoodItem = {
         id: `recipe-${currentRecipe.title}-${Date.now()}`,
         name: currentRecipe.title,
-        price: currentRecipe.plan.shopping_list.reduce((sum, item) => sum + item.chosen_product.price, 0),
         url: '#',
         image: '/placeholder-recipe.jpg',
-        pricePerUnit: `$${(currentRecipe.plan.shopping_list.reduce((sum, item) => sum + item.chosen_product.price, 0) / currentRecipe.generated.servings).toFixed(2)} per serving`,
-        shopName: Array.from(new Set(currentRecipe.plan.shopping_list.map(item => item.chosen_product.shop))).join(', '),
         isAvailable: true,
         category: 'recipe',
         // Store the full recipe data to avoid API calls later
-        recipeData: {
-          generated: currentRecipe.generated,
-          plan: currentRecipe.plan
-        }
+        recipeData: currentRecipe
       }
       addLikedMeal(recipeAsFoodItem)
       
@@ -67,7 +61,7 @@ export default function RecipeSwiper({ recipes, onBack, onShowLikedMeals }: Reci
     setCurrentIndex(0)
   }
 
-  if (successfulRecipes.length === 0) {
+  if (recipes.length === 0) {
     return (
       <motion.div 
         initial={{ y: '100%' }}
@@ -118,7 +112,7 @@ export default function RecipeSwiper({ recipes, onBack, onShowLikedMeals }: Reci
         
         <div className="text-center flex-1 mx-4">
           <div className="text-lg font-semibold">
-            Recipe {currentIndex + 1} / {successfulRecipes.length}
+            Recipe {currentIndex + 1} / {recipes.length}
           </div>
           <div className="text-sm text-muted-foreground">
             {likedCount} favorites
@@ -179,7 +173,7 @@ export default function RecipeSwiper({ recipes, onBack, onShowLikedMeals }: Reci
               <div className="text-6xl mb-6">🎉</div>
               <h2 className="text-3xl font-bold mb-4">All recipes reviewed!</h2>
               <p className="text-lg text-muted-foreground mb-8">
-                You've reviewed {successfulRecipes.length} recipes and saved {likedCount} favorites
+                You've reviewed {recipes.length} recipes and saved {likedCount} favorites
               </p>
               <div className="flex gap-4">
                 <Button onClick={handleReset} variant="outline">

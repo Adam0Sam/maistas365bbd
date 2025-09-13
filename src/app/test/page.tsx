@@ -477,28 +477,28 @@ export default function TestPageComponent() {
                     number: 1,
                     instruction:
                       "Put the chicken breasts between two pieces of baking parchment and use a rolling pin to gently bash them until they are approximately 1cm thick.",
-                    duration_minutes: null,
+                    duration_minutes: 1,
                   },
                   {
                     step_id: "s2",
                     number: 2,
                     instruction:
                       "Cut each chicken breast into two even pieces.",
-                    duration_minutes: null,
+                    duration_minutes: 10,
                   },
                   {
                     step_id: "s3",
                     number: 3,
                     instruction:
                       "If you're using a frying pan, heat two frying pans over medium-high heat, with one of them containing oil.",
-                    duration_minutes: null,
+                    duration_minutes: 3,
                   },
                   {
                     step_id: "s4",
                     number: 4,
                     instruction:
                       "Fry the chicken in the oiled pan for 3-4 mins on each side until they are cooked through.",
-                    duration_minutes: 4,
+                    duration_minutes: 20,
                   },
                   {
                     step_id: "s5",
@@ -525,7 +525,7 @@ export default function TestPageComponent() {
                     number: 8,
                     instruction:
                       "Add the chicken to the air-fryer and cook for 12 mins.",
-                    duration_minutes: 12,
+                    duration_minutes: null,
                   },
                   {
                     step_id: "s9",
@@ -592,7 +592,7 @@ export default function TestPageComponent() {
                     number: 2,
                     instruction:
                       "Add the halloumi to the air fryer basket and cook for 10 mins, turning halfway through, until it's golden.",
-                    duration_minutes: 10,
+                    duration_minutes: null,
                   },
                 ],
               },
