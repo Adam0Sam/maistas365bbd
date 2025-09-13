@@ -414,7 +414,7 @@ function MealModal({ meal, mealData, isLoading, onClose, onRemove }: MealModalPr
     }
   }
 
-  const totalIngredientPrice = mealData?.ingredients.reduce((sum, ing) => sum + ing.price, 0) || 0
+  const totalIngredientPrice = mealData?.ingredients.reduce((sum: number, ing: any) => sum + (ing.price || 0), 0) || 0
 
   return (
     <motion.div

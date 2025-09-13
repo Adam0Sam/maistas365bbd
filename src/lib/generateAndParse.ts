@@ -3,6 +3,7 @@ import OpenAI from "openai";
 import { z } from "zod";
 import { zodResponseFormat } from "openai/helpers/zod.mjs";
 import { planRecipe } from "./parse-recipe-ai";
+import { processBatchRecipes } from "./batch-recipe-processor";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -53,7 +54,7 @@ export async function generateAndPlanRecipes({
    fields,
    limit,
 }: BatchPlanInput): Promise<PlannedRecipeResult[]> {
-   // 1) Generate 6 recipes in strict JSON
+   // 1) Generate 6 recipes in strict JSON (1 API call)
    const gen = await openai.chat.completions.parse({
       model: "gpt-5-mini-2025-08-07",
       messages: [
@@ -84,49 +85,63 @@ export async function generateAndPlanRecipes({
       | undefined;
    if (!parsed) throw new Error("Failed to generate recipes");
 
-   // 2) For each generated recipe, compose a compact “recipe text” and run planRecipe
-   const results = await Promise.allSettled(
-      parsed.recipes.map(async (r) => {
-         const recipeText =
-            `Title: ${r.title}\n` +
-            (r.description ? `Description: ${r.description}\n` : "") +
-            (typeof r.servings === "number"
-               ? `Servings: ${r.servings}\n`
-               : "") +
-            `Ingredients:\n` +
-            r.ingredients
-               .map((i) => `- ${i.quantity ?? ""} ${i.name}`.trim())
-               .join("\n") +
-            `\nInstructions:\n` +
-            r.instructions.map((step, idx) => `${idx + 1}. ${step}`).join("\n");
+   // 2) Process all recipes in batch (only 2 more API calls total instead of 12)
+   try {
+      const batchResults = await processBatchRecipes(
+         parsed.recipes,
+         requirements,
+         fields,
+         limit
+      );
+      
+      return batchResults;
+   } catch (error) {
+      console.error("Batch processing failed, falling back to individual processing:", error);
+      
+      // Fallback to individual processing if batch fails
+      const results = await Promise.allSettled(
+         parsed.recipes.map(async (r) => {
+            const recipeText =
+               `Title: ${r.title}\n` +
+               (r.description ? `Description: ${r.description}\n` : "") +
+               (typeof r.servings === "number"
+                  ? `Servings: ${r.servings}\n`
+                  : "") +
+               `Ingredients:\n` +
+               r.ingredients
+                  .map((i) => `- ${i.quantity ?? ""} ${i.name}`.trim())
+                  .join("\n") +
+               `\nInstructions:\n` +
+               r.instructions.map((step, idx) => `${idx + 1}. ${step}`).join("\n");
 
-         const plan = await planRecipe({
-            recipe: recipeText, // reuse your existing “mine parse recipe”/plan pipeline
-            requirements, // same requirements passed through
-            fields,
-            limit,
-         });
+            const plan = await planRecipe({
+               recipe: recipeText,
+               requirements,
+               fields,
+               limit,
+            });
 
+            return {
+               ok: true as const,
+               title: r.title,
+               generated: r,
+               plan,
+            };
+         })
+      );
+
+      // Normalize fulfilled/rejected into a single array
+      const normalized: PlannedRecipeResult[] = results.map((res, idx) => {
+         const g = parsed.recipes[idx];
+         if (res.status === "fulfilled") return res.value;
          return {
-            ok: true as const,
-            title: r.title,
-            generated: r,
-            plan,
+            ok: false,
+            title: g.title,
+            generated: g,
+            error: res.reason?.message ?? "Unknown error",
          };
-      })
-   );
+      });
 
-   // 3) Normalize fulfilled/rejected into a single array
-   const normalized: PlannedRecipeResult[] = results.map((res, idx) => {
-      const g = parsed.recipes[idx];
-      if (res.status === "fulfilled") return res.value;
-      return {
-         ok: false,
-         title: g.title,
-         generated: g,
-         error: res.reason?.message ?? "Unknown error",
-      };
-   });
-
-   return normalized;
+      return normalized;
+   }
 }
