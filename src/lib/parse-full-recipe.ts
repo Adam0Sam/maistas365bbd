@@ -69,7 +69,7 @@ export async function parseFullRecipeAI(input: ParseFullRecipeBody) {
    ];
 
    const completion = await openai.chat.completions.parse({
-      model: "gpt-5-mini-2025-08-07",
+      model: "gpt-4o-mini",
       messages,
       response_format: zodResponseFormat(ParsedRecipeSchema, "parsed_recipe"),
    });
@@ -316,7 +316,7 @@ export async function parseRecipeAnnotatedAI(input: ParseFullRecipeBody) {
    ];
 
    const completion = await openai.chat.completions.parse({
-      model: "gpt-5-mini-2025-08-07",
+      model: "gpt-4o-mini",
       messages,
       response_format: zodResponseFormat(
          AnnotatedRecipeResponseSchema,

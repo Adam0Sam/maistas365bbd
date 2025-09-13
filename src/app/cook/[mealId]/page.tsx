@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, ChefHat, Check, ShoppingCart, Clock, Users, Star, ChevronRight, X, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, ChefHat, Check, ShoppingCart, Clock, Users, Star, ChevronRight, X, CheckCircle2, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { RecipeModal } from "@/components/RecipeModal";
@@ -13,6 +13,7 @@ import { FoodItem } from "@/types/food";
 import { ParsedRecipe, StepGraph } from "@/lib/parse-full-recipe";
 import { ShoppingList } from "@/types/shopping";
 import { ShoppingService } from "@/services/shopping";
+import { setupShoppingDebug } from "@/lib/shopping-debug";
 
 export default function CookPage() {
   const params = useParams();
@@ -253,7 +254,7 @@ export default function CookPage() {
       if (!navigator.geolocation) {
         console.warn('Geolocation not supported');
         setLocationPermission('unavailable');
-        setUserLocation({ lat: 54.8985, lng: 23.9036 }); // Kaunas, Lithuania
+        setUserLocation({ lat: 54.6872, lng: 25.2797 }); // Vilnius, Lithuania
         return;
       }
 
@@ -267,7 +268,7 @@ export default function CookPage() {
             requestLocation();
           } else if (result.state === 'denied') {
             // Use fallback location if denied
-            setUserLocation({ lat: 54.8985, lng: 23.9036 });
+            setUserLocation({ lat: 54.6872, lng: 25.2797 });
           }
           // If prompt, we'll show the permission modal when shopping is initiated
         } catch (error) {
@@ -296,9 +297,11 @@ export default function CookPage() {
     };
 
     try {
+      console.log("Getting position")
       const position = await new Promise<GeolocationPosition>((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(resolve, reject, options);
       });
+      console.log("position: ", position)
 
       const { latitude, longitude, accuracy } = position.coords;
       console.log(`📍 Location acquired: ${latitude}, ${longitude} (accuracy: ${accuracy}m)`);
@@ -313,7 +316,7 @@ export default function CookPage() {
       
       if (error.code === error.PERMISSION_DENIED) {
         setLocationPermission('denied');
-        setUserLocation({ lat: 54.8985, lng: 23.9036 });
+        setUserLocation({ lat: 54.6872, lng: 25.2797 });
       } else {
         // Try again with lower accuracy as fallback
         try {
@@ -335,7 +338,7 @@ export default function CookPage() {
           setLocationPermission('granted');
         } catch (fallbackError) {
           console.error('Fallback location also failed:', fallbackError);
-          setUserLocation({ lat: 54.8985, lng: 23.9036 });
+          setUserLocation({ lat: 54.6872, lng: 25.2797 });
         }
       }
     } finally {
@@ -395,7 +398,7 @@ export default function CookPage() {
       console.log('Missing ingredients:', missingIngredients);
 
       const shoppingService = ShoppingService.getInstance();
-      const currentLocation = userLocation || { lat: 54.8985, lng: 23.9036 }; // Kaunas fallback
+      const currentLocation = userLocation || { lat: 54.6872, lng: 25.2797 }; // Vilnius fallback
       
       console.log('Generating shopping list...');
       const generatedShoppingList = await shoppingService.generateShoppingList(
@@ -435,7 +438,7 @@ export default function CookPage() {
   const handleLocationPermissionDecline = () => {
     setShowLocationPermissionModal(false);
     setLocationPermission('denied');
-    setUserLocation({ lat: 54.8985, lng: 23.9036 }); // Kaunas fallback
+    setUserLocation({ lat: 54.6872, lng: 25.2797 }); // Vilnius fallback
     // Continue with shopping list generation using fallback location
     setTimeout(() => handleStartCooking(), 100);
   };
@@ -799,21 +802,21 @@ function IngredientsModal({
         {/* Ingredients List */}
         <div className="p-6 max-h-96 overflow-y-auto">
           {recipe.ingredients.length > 0 ? (
-            <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
               {recipe.ingredients.map((ingredient, index) => {
                 const isSelected = selectedIngredients.has(index);
                 const isCore = ingredient.core;
 
                 return (
                   <motion.button
-                    key={index}
+                    key={`ingredient-${index}-${ingredient.name}`}
                     onClick={() => onToggleIngredient(index)}
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: index * 0.05 }}
-                    className={`w-full flex items-center gap-4 p-4 rounded-2xl border-2 transition-all duration-300 group ${
+                    className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 transition-all duration-300 group ${
                       isSelected
-                        ? 'border-green-300 shadow-lg'
+                        ? 'border-green-300 shadow-md'
                         : 'bg-neutral-50 border-neutral-200 hover:border-primary-200 hover:bg-primary-25'
                     }`}
                     style={isSelected ? {
@@ -822,7 +825,7 @@ function IngredientsModal({
                   >
                     {/* Checkbox */}
                     <div 
-                      className={`relative flex items-center justify-center w-6 h-6 rounded-lg border-2 transition-all duration-300 ${
+                      className={`relative flex items-center justify-center w-5 h-5 rounded-md border-2 transition-all duration-300 cursor-pointer ${
                         isSelected
                           ? 'border-transparent'
                           : 'border-neutral-300 group-hover:border-primary-400'
@@ -838,47 +841,38 @@ function IngredientsModal({
                             animate={{ scale: 1, opacity: 1 }}
                             exit={{ scale: 0, opacity: 0 }}
                           >
-                            <Check className="h-4 w-4 text-white" />
+                            <Check className="h-3 w-3 text-white" />
+                            
                           </motion.div>
                         )}
                       </AnimatePresence>
                     </div>
 
                     {/* Ingredient Info */}
-                    <div className="flex-1 text-left">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className={`font-semibold transition-colors ${
-                          isSelected ? 'text-primary-800' : 'text-neutral-800 group-hover:text-primary-700'
+                    <div className="flex-1 text-left min-w-0">
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-1">
+                          <h3 className={`font-medium text-sm transition-colors truncate ${
+                            isSelected ? 'text-primary-800' : 'text-neutral-800 group-hover:text-primary-700'
+                          }`}>
+                            {ingredient.name}
+                          </h3>
+                          {isCore && (
+                            <Badge 
+                              className="text-white text-xs px-1 py-0 flex-shrink-0"
+                              style={{ background: 'linear-gradient(90deg, #6279b8 0%, #5469a4 100%)' }}
+                            >
+                              ✓
+                            </Badge>
+                          )}
+                        </div>
+                        <span className={`text-xs transition-colors truncate ${
+                          isSelected ? 'text-primary-600' : 'text-neutral-600'
                         }`}>
-                          {ingredient.name}
-                        </h3>
-                        {isCore && (
-                          <Badge 
-                            className="text-white text-xs"
-                            style={{ background: 'linear-gradient(90deg, #6279b8 0%, #5469a4 100%)' }}
-                          >
-                            Essential
-                          </Badge>
-                        )}
+                          {ingredient.quantity} {ingredient.unit}
+                        </span>
                       </div>
-                      <p className={`text-sm transition-colors ${
-                        isSelected ? 'text-primary-600' : 'text-neutral-600'
-                      }`}>
-                        {ingredient.quantity} {ingredient.unit}
-                      </p>
                     </div>
-
-                    {/* Selection Indicator */}
-                    <div 
-                      className={`w-3 h-3 rounded-full transition-all duration-300 ${
-                        isSelected
-                          ? 'shadow-lg'
-                          : 'bg-neutral-300 group-hover:bg-primary-400'
-                      }`}
-                      style={isSelected ? {
-                        background: 'linear-gradient(90deg, #4c9f70 0%, #6279b8 100%)'
-                      } : {}}
-                    />
                   </motion.button>
                 );
               })}
@@ -1093,16 +1087,15 @@ function LoadingModal({ title, message }: LoadingModalProps) {
       >
         {/* Content */}
         <div className="p-8 text-center">
-          <motion.div
+          {/* <motion.div
             animate={{ rotate: 360 }}
             transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
             className="w-16 h-16 border-4 border-t-transparent rounded-full mx-auto mb-6"
             style={{ borderColor: '#3d8059', borderTopColor: 'transparent' }}
-          />
+          /> */}
           
           <h2 className="text-2xl font-bold mb-4 text-gray-900">{title}</h2>
           <p className="text-gray-600 mb-6">{message}</p>
-          
           <div className="flex justify-center space-x-2">
             <motion.div
               animate={{ scale: [1, 1.2, 1] }}

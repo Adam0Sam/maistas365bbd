@@ -7,9 +7,15 @@ import {
   APIRecipeResponse,
   APIShoppingLists
 } from '@/types/shopping';
+import { ShoppingCache } from '@/lib/shopping-cache';
 
 export class ShoppingService {
   private static instance: ShoppingService;
+  private cache: ShoppingCache;
+
+  constructor() {
+    this.cache = ShoppingCache.getInstance();
+  }
 
   static getInstance(): ShoppingService {
     if (!ShoppingService.instance) {
@@ -26,7 +32,16 @@ export class ShoppingService {
     recipe: any // Full recipe object with instructions
   ): Promise<ShoppingList> {
     try {
-      console.log('🛒 [ShoppingService] Calling real API for shopping list generation...');
+      // Check cache first
+      console.log('🔍 [ShoppingService] Checking cache for shopping list...');
+      const cachedResult = this.cache.getCachedShoppingList(recipeId, missingIngredients, userLocation);
+      
+      if (cachedResult) {
+        console.log('⚡ [ShoppingService] Using cached shopping list data');
+        return cachedResult;
+      }
+
+      console.log('🛒 [ShoppingService] No cache found, calling real API for shopping list generation...');
       
       // Call the real API endpoint
       const apiResponse = await fetch('/api/chat/parse-recipe', {
@@ -59,7 +74,7 @@ export class ShoppingService {
         userLocation
       );
 
-      return {
+      const shoppingList: ShoppingList = {
         id: `shopping_${Date.now()}`,
         recipe_id: recipeId,
         recipe_name: recipeName,
@@ -69,12 +84,34 @@ export class ShoppingService {
         generated_at: new Date().toISOString(),
         expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
       };
+
+      // Cache the result
+      console.log('💾 [ShoppingService] Caching shopping list data...');
+      this.cache.cacheShoppingList(recipeId, missingIngredients, userLocation, shoppingList);
+
+      return shoppingList;
     } catch (error) {
       console.error('❌ [ShoppingService] Error generating shopping list:', error);
       
-      // Fallback to mock data if API fails
+      // Check if we have any cached data for this meal (even if slightly different ingredients/location)
+      console.log('🔄 [ShoppingService] Checking for any cached data as fallback...');
+      const fallbackCached = this.cache.getCachedShoppingList(recipeId, missingIngredients, userLocation);
+      
+      if (fallbackCached) {
+        console.log('⚡ [ShoppingService] Using cached data as fallback');
+        return fallbackCached;
+      }
+
+      // Final fallback to mock data
       console.log('🔄 [ShoppingService] Falling back to mock data...');
-      return this.generateMockShoppingList(recipeId, recipeName, missingIngredients, userLocation);
+      const mockResult = await this.generateMockShoppingList(recipeId, recipeName, missingIngredients, userLocation);
+      
+      // Cache the mock result too (with shorter expiration)
+      console.log('💾 [ShoppingService] Caching mock data with shorter expiration...');
+      const shortCacheDuration = 1000 * 60 * 15; // 15 minutes for mock data
+      this.cache.cacheShoppingList(recipeId, missingIngredients, userLocation, mockResult, shortCacheDuration);
+      
+      return mockResult;
     }
   }
 
@@ -194,10 +231,10 @@ export class ShoppingService {
   }
 
   private generateStoreAddress(storeName: string): string {
-    const streets = ['Gedimino pr.', 'Vilniaus g.', 'Kęstučio g.', 'Savanorių pr.', 'Laisvės al.'];
+    const streets = ['Gedimino pr.', 'Konstitucijos pr.', 'Kalvarijų g.', 'Savanorių pr.', 'Ukmergės g.'];
     const street = streets[Math.floor(Math.random() * streets.length)];
     const number = Math.floor(Math.random() * 200) + 1;
-    return `${street} ${number}, Kaunas, Lithuania`;
+    return `${street} ${number}, Vilnius, Lithuania`;
   }
 
   private generatePhoneNumber(): string {
@@ -381,5 +418,15 @@ export class ShoppingService {
     }
     
     return 'Generic';
+  }
+
+  // Cache management methods
+  clearShoppingCache(): void {
+    console.log('🗑️ [ShoppingService] Clearing all shopping cache...');
+    this.cache.clearAllCache();
+  }
+
+  getCacheStats() {
+    return this.cache.getCacheStats();
   }
 }

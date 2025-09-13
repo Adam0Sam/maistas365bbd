@@ -7,7 +7,12 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ShoppingList, StoreShoppingList, ShoppingComparison } from '@/types/shopping';
 import { ShoppingService } from '@/services/shopping';
-import { StoreMap } from './StoreMap';
+import dynamic from 'next/dynamic';
+
+const StoreMap = dynamic(() => import('./StoreMap').then(mod => ({ default: mod.StoreMap })), {
+  ssr: false,
+  loading: () => <div className="h-64 bg-neutral-100 rounded-lg flex items-center justify-center">Loading map...</div>
+});
 
 interface ShoppingModalProps {
   shoppingList: ShoppingList;

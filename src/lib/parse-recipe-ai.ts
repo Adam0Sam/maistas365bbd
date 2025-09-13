@@ -73,7 +73,7 @@ export async function planRecipe({
    // 1) Enhance provided ingredients with search descriptions
    console.log(`🥕 [planRecipe] Step 1: Enhancing ingredients with search descriptions...`);
    const enhance = await openai.chat.completions.parse({
-      model: "gpt-5-2025-08-07",
+      model: "gpt-4o-mini",
       messages: [ 
          {
             role: "system",
@@ -128,7 +128,7 @@ export async function planRecipe({
    // 3) Select shopping list
    console.log(`🛒 [planRecipe] Step 3: Selecting products from candidates...`);
    const select = await openai.chat.completions.parse({
-      model: "gpt-5-2025-08-07",
+      model: "gpt-4o-mini",
       messages: [
          {
             role: "system",

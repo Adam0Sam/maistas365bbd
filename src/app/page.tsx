@@ -198,7 +198,6 @@ function HomeContent() {
 
   return (
     <div className="min-h-screen relative overflow-hidden">
-      <AnimatePresence mode="wait">
       {/* Base Background */}
       <div className="absolute inset-0 bg-gradient-to-br from-slate-50 via-white to-blue-50"></div>
       
@@ -225,6 +224,8 @@ function HomeContent() {
       
       {/* Subtle Grid Pattern */}
       <div className="absolute inset-0 opacity-[0.015] bg-[radial-gradient(circle_at_1px_1px,rgba(76,159,112,0.3)_1px,transparent_0)] bg-[length:60px_60px]"></div>
+
+      <AnimatePresence mode="wait">
 
       {/* Navigation */}
       {/* <motion.nav
