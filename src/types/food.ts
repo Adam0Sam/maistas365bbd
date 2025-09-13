@@ -15,6 +15,29 @@ export interface FoodItem {
     carbs?: number
     fat?: number
   }
+  // Full recipe data from generateBatch API (for liked recipes)
+  recipeData?: {
+    generated: {
+      title: string
+      description: string
+      servings: number
+      ingredients: Array<{ name: string; quantity: string }>
+      instructions: string[]
+    }
+    plan: {
+      ingredients: Array<{ name: string; quantity: string; search_description: string }>
+      candidates: Record<string, any[]>
+      shopping_list: Array<{
+        ingredient: string
+        chosen_product: {
+          productId: string
+          name: string
+          price: number
+          shop: string
+        }
+      }>
+    }
+  }
 }
 
 export interface Recipe {

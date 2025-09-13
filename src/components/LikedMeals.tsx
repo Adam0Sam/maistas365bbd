@@ -3,7 +3,7 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Heart, ShoppingBag, DollarSign, Trash2, ChefHat, Clock, Users, X, Check, CheckCircle2 } from 'lucide-react'
+import { ArrowLeft, Heart, ShoppingBag, Trash2, ChefHat, Clock, Users, X, Check, CheckCircle2 } from 'lucide-react'
 import { useLikedMeals } from '@/contexts/LikedMealsContext'
 import { FoodItem } from '@/types/food'
 import { useState, useEffect, useCallback } from 'react'
@@ -14,97 +14,71 @@ interface LikedMealsProps {
   onStartOver: () => void
 }
 
-// Fetch real meal data from API
+// Get meal data from stored recipeData (for recipes) or generate fallback (for food items)
 const getMealData = async (meal: FoodItem) => {
-  try {
-    const recipeText = `Create a recipe using ${meal.name} as the main ingredient.`;
-    const requirements = `Budget-friendly ingredients from ${meal.shopName || 'local grocery stores'}. Include nutritious and accessible ingredients.`;
-
-    const response = await fetch('/api/chat/parse-recipe', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        recipe: recipeText,
-        requirements,
-        fields: ['productId', 'name', 'price', 'shop'],
-        limit: 5
-      })
-    });
-
-    if (!response.ok) {
-      throw new Error(`API call failed: ${response.status}`);
-    }
-
-    const data = await response.json();
-
-    // Transform API response to match expected format
-    const ingredients = data.shopping_list?.map((item: {ingredient: string; chosen_product: {name: string; price: number} | null}) => ({
-      name: item.chosen_product?.name || item.ingredient,
-      amount: data.ingredients?.find((ing: {name: string; quantity: string}) => ing.name.toLowerCase().includes(item.ingredient.toLowerCase()))?.quantity || '1 unit',
-      price: item.chosen_product?.price || 0,
-      category: 'ingredient'
-    })) || [];
-
-    // Add the main meal item if not already included
-    const mainIngredientExists = ingredients.some((ing: {name: string}) => 
-      ing.name.toLowerCase().includes(meal.name.toLowerCase())
-    );
+  // If this is a recipe with stored data, use it directly
+  if (meal.recipeData) {
+    console.log(`✅ Using stored recipe data for ${meal.name} - no API call needed!`);
+    const { generated, plan } = meal.recipeData;
     
-    if (!mainIngredientExists) {
-      ingredients.unshift({
-        name: meal.name,
-        amount: '1 lb',
-        price: meal.price,
-        category: meal.category || 'main'
-      });
-    }
+    // Transform the stored data to match the expected format
+    const ingredients = plan.shopping_list.map((item) => ({
+      name: item.chosen_product.name,
+      amount: plan.ingredients.find((ing) => 
+        ing.name.toLowerCase().includes(item.ingredient.toLowerCase())
+      )?.quantity || '1 unit',
+      price: item.chosen_product.price,
+      category: 'ingredient'
+    }));
+
+    // Calculate a reasonable difficulty based on ingredient count and instructions
+    const getDifficulty = () => {
+      const ingredientCount = generated.ingredients.length;
+      const instructionCount = generated.instructions.length;
+      
+      if (ingredientCount <= 5 && instructionCount <= 4) return 'Easy';
+      if (ingredientCount <= 10 && instructionCount <= 8) return 'Medium';
+      return 'Hard';
+    };
+
+    // Estimate cook time based on instructions (more instructions = longer cook time)
+    const estimatedCookTime = Math.min(15 + (generated.instructions.length * 5), 60);
 
     return {
       recipe: {
-        description: `A delicious recipe featuring ${meal.name} with fresh ingredients and simple cooking techniques.`,
-        cookTime: Math.floor(Math.random() * 45) + 15,
-        servings: Math.floor(Math.random() * 4) + 2,
-        difficulty: ['Easy', 'Medium', 'Hard'][Math.floor(Math.random() * 3)] as 'Easy' | 'Medium' | 'Hard',
-        instructions: [
-          'Prepare all ingredients by washing and chopping as needed',
-          `Season the ${meal.name} with salt and pepper to taste`,
-          'Heat oil in a large skillet over medium-high heat',
-          'Add ingredients according to cooking requirements',
-          'Cook until tender and flavors are well combined',
-          'Taste and adjust seasoning as needed',
-          'Serve hot and enjoy your delicious meal!'
-        ]
+        description: generated.description,
+        cookTime: estimatedCookTime,
+        servings: generated.servings,
+        difficulty: getDifficulty() as 'Easy' | 'Medium' | 'Hard',
+        instructions: generated.instructions
       },
       ingredients
     };
-  } catch (error) {
-    console.error('Error fetching meal data:', error);
-    // Fallback to basic data structure if API call fails
-    return {
-      recipe: {
-        description: `A delicious ${meal.name} recipe that combines fresh ingredients with simple cooking techniques.`,
-        cookTime: Math.floor(Math.random() * 45) + 15,
-        servings: Math.floor(Math.random() * 4) + 2,
-        difficulty: ['Easy', 'Medium', 'Hard'][Math.floor(Math.random() * 3)] as 'Easy' | 'Medium' | 'Hard',
-        instructions: [
-          'Prepare all ingredients by washing and chopping as needed',
-          `Season the ${meal.name} with salt and pepper`,
-          'Heat oil in a large skillet over medium-high heat',
-          'Cook ingredients according to recipe specifications',
-          'Taste and adjust seasoning as needed',
-          'Serve hot and enjoy!'
-        ]
-      },
-      ingredients: [
-        { name: meal.name, amount: '1 lb', price: meal.price, category: meal.category || 'main' },
-        { name: 'Olive Oil', amount: '2 tbsp', price: 0.50, category: 'pantry' },
-        { name: 'Salt', amount: '1 tsp', price: 0.10, category: 'seasoning' },
-        { name: 'Black Pepper', amount: '1/2 tsp', price: 0.15, category: 'seasoning' }
-      ]
-    };
   }
+  
+  // Fallback for regular food items (non-recipes) - no API call needed
+  return {
+    recipe: {
+      description: `A delicious ${meal.name} recipe that combines fresh ingredients with simple cooking techniques.`,
+      cookTime: Math.floor(Math.random() * 45) + 15,
+      servings: Math.floor(Math.random() * 4) + 2,
+      difficulty: ['Easy', 'Medium', 'Hard'][Math.floor(Math.random() * 3)] as 'Easy' | 'Medium' | 'Hard',
+      instructions: [
+        'Prepare all ingredients by washing and chopping as needed',
+        `Season the ${meal.name} with salt and pepper`,
+        'Heat oil in a large skillet over medium-high heat',
+        'Cook ingredients according to recipe specifications',
+        'Taste and adjust seasoning as needed',
+        'Serve hot and enjoy!'
+      ]
+    },
+    ingredients: [
+      { name: meal.name, amount: '1 lb', price: meal.price, category: meal.category || 'main' },
+      { name: 'Olive Oil', amount: '2 tbsp', price: 0.50, category: 'pantry' },
+      { name: 'Salt', amount: '1 tsp', price: 0.10, category: 'seasoning' },
+      { name: 'Black Pepper', amount: '1/2 tsp', price: 0.15, category: 'seasoning' }
+    ]
+  };
 }
 
 interface MealDataCache {
@@ -171,7 +145,6 @@ export default function LikedMeals({ onBack, onStartOver }: LikedMealsProps) {
 
   // Filter meals based on completion status - always show uncompleted by default
   const uncompletedMeals = getUncompletedMeals()
-  console.log("get uncompleted meals", uncompletedMeals)
   const completedMeals = likedMeals.filter(meal => meal.isCompleted)
   const displayedMeals = showCompleted ? completedMeals : uncompletedMeals
 
@@ -322,10 +295,6 @@ export default function LikedMeals({ onBack, onStartOver }: LikedMealsProps) {
               removeLikedMeal(selectedMeal.id)
               handleCloseModal()
             }}
-            onToggleCompleted={() => {
-              handleToggleCompleted(selectedMeal)
-              handleCloseModal()
-            }}
           />
         )}
       </AnimatePresence>
@@ -361,7 +330,7 @@ function GridMealCard({ meal, index, onClick, onRemove, onToggleCompleted, isCom
         y: -2,
         transition: { duration: 0.2 }
       }}
-      className="bg-card border border-border rounded-xl shadow-lg hover:shadow-xl cursor-pointer overflow-hidden transition-all duration-200"
+      className="bg-card border border-border rounded-xl shadow-lg hover:shadow-xl cursor-pointer overflow-hidden transition-all duration-200 flex flex-col h-80"
       onClick={onClick}
     >
       {/* Card Image */}
@@ -386,13 +355,13 @@ function GridMealCard({ meal, index, onClick, onRemove, onToggleCompleted, isCom
       </div>
 
       {/* Card Content */}
-      <div className="p-4 space-y-3">
+      <div className="p-4 flex flex-col gap-3 flex-1">
         {/* Title and Action Buttons */}
-        <div className="flex items-start gap-2">
-          <h3 className={`text-lg font-bold line-clamp-2 flex-1 leading-tight ${isCompleted ? 'line-through opacity-60' : ''}`}>
+        <div className="flex items-start gap-2 min-h-[3rem]">
+          <h3 className={`text-base font-bold flex-1 leading-tight min-w-0 line-clamp-2 break-words ${isCompleted ? 'line-through opacity-60' : ''}`}>
             {meal.name}
           </h3>
-          <div className="flex gap-1">
+          <div className="flex gap-1 flex-shrink-0">
             <button
               type="button"
               onClick={(e) => {
@@ -425,13 +394,13 @@ function GridMealCard({ meal, index, onClick, onRemove, onToggleCompleted, isCom
         </div>
         
         {/* Category and Price Row */}
-        <div className="flex items-center justify-between gap-2">
-          <Badge variant="secondary" className="text-xs px-2 py-1 truncate max-w-20">
+        <div className="flex items-center justify-between gap-2 min-h-[1.5rem]">
+          <Badge variant="secondary" className="text-xs px-2 py-1 truncate flex-shrink-0" style={{ maxWidth: '5rem' }}>
             {meal.category || 'food'}
           </Badge>
           <div className="flex items-center gap-1 flex-shrink-0">
-            <DollarSign className="h-3.5 w-3.5 text-green-600" />
-            <span className="font-bold text-green-600 text-sm">
+            {/* <DollarSign className="h-3.5 w-3.5 text-green-600" /> */}
+            <span className="font-bold text-green-600 text-sm whitespace-nowrap">
               ${displayPrice}
             </span>
           </div>
@@ -439,23 +408,26 @@ function GridMealCard({ meal, index, onClick, onRemove, onToggleCompleted, isCom
 
         {/* Shop Name */}
         {meal.shopName && (
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 min-h-[1rem]">
             <ShoppingBag className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-            <span className="text-xs text-muted-foreground truncate">
+            <span className="text-xs text-muted-foreground truncate min-w-0 flex-1">
               {meal.shopName}
             </span>
           </div>
         )}
 
+        {/* Spacer to push last row to bottom */}
+        <div className="flex-grow"></div>
+        
         {/* Time and Heart Row */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1">
+        <div className="flex items-center justify-between min-h-[1rem]">
+          <div className="flex items-center gap-1 flex-shrink-0">
             <Clock className="h-3 w-3 text-muted-foreground" />
-            <span className="text-xs text-muted-foreground">
+            <span className="text-xs text-muted-foreground whitespace-nowrap">
               {estimatedTime}min
             </span>
           </div>
-          <Heart className="h-4 w-4 text-red-500 fill-current opacity-80" />
+          <Heart className="h-4 w-4 text-red-500 fill-current opacity-80 flex-shrink-0" />
         </div>
       </div>
     </motion.div>
@@ -468,10 +440,9 @@ interface MealModalProps {
   isLoading: boolean
   onClose: () => void
   onRemove: () => void
-  onToggleCompleted: () => void
 }
 
-function MealModal({ meal, mealData, isLoading, onClose, onRemove, onToggleCompleted }: MealModalProps) {
+function MealModal({ meal, mealData, isLoading, onClose, onRemove }: MealModalProps) {
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty) {
       case 'Easy': return 'text-green-600 bg-green-100'
@@ -507,8 +478,8 @@ function MealModal({ meal, mealData, isLoading, onClose, onRemove, onToggleCompl
             <div className="flex items-center gap-4">
               <Badge variant="secondary">{meal.category}</Badge>
               <div className="flex items-center gap-1">
-                <DollarSign className="h-4 w-4 text-green-600" />
-                <span className="font-semibold text-green-600">${meal.price}</span>
+                {/* <DollarSign className="h-4 w-4 text-green-600" /> */}
+                <span className="font-semibold text-green-600">${typeof meal.price === 'number' ? meal.price.toFixed(2) : '0.00'}</span>
               </div>
               {isLoading ? (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -533,7 +504,7 @@ function MealModal({ meal, mealData, isLoading, onClose, onRemove, onToggleCompl
             </div>
           </div>
           <div className="flex gap-2 ml-4">
-            <Button
+            {/* <Button
               variant={meal.isCompleted ? "default" : "outline"}
               size="sm"
               onClick={onToggleCompleted}
@@ -541,7 +512,7 @@ function MealModal({ meal, mealData, isLoading, onClose, onRemove, onToggleCompl
             >
               <Check className="h-4 w-4" />
               {meal.isCompleted ? "Cooked" : "Mark Cooked"}
-            </Button>
+            </Button> */}
             <Button
               variant="outline"
               size="sm"

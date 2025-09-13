@@ -41,7 +41,12 @@ export default function RecipeSwiper({ recipes, onBack, onShowLikedMeals }: Reci
         pricePerUnit: `$${(currentRecipe.plan.shopping_list.reduce((sum, item) => sum + item.chosen_product.price, 0) / currentRecipe.generated.servings).toFixed(2)} per serving`,
         shopName: Array.from(new Set(currentRecipe.plan.shopping_list.map(item => item.chosen_product.shop))).join(', '),
         isAvailable: true,
-        category: 'recipe'
+        category: 'recipe',
+        // Store the full recipe data to avoid API calls later
+        recipeData: {
+          generated: currentRecipe.generated,
+          plan: currentRecipe.plan
+        }
       }
       addLikedMeal(recipeAsFoodItem)
       
