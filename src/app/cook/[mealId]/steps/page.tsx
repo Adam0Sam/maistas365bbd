@@ -45,10 +45,64 @@ export default function CookingStepsPage() {
   const [error, setError] = useState<string | null>(null);
   const [carouselApi, setCarouselApi] = useState<CarouselApi>();
 
+  // Generate storage keys based on meal ID
+  const getStorageKey = (suffix: string) => {
+    const encodedMealId = params?.mealId as string;
+    return `cooking_${encodedMealId}_${suffix}`;
+  };
+
+  // Load state from localStorage
+  useEffect(() => {
+    if (typeof window === 'undefined' || !params?.mealId) return;
+    
+    try {
+      // Load current step index
+      const savedStepIndex = localStorage.getItem(getStorageKey('currentStep'));
+      if (savedStepIndex) {
+        setCurrentStepIndex(parseInt(savedStepIndex, 10));
+      }
+
+      // Load completed steps
+      const savedCompletedSteps = localStorage.getItem(getStorageKey('completedSteps'));
+      if (savedCompletedSteps) {
+        setCompletedSteps(new Set(JSON.parse(savedCompletedSteps)));
+      }
+
+      // Load active timers
+      const savedTimers = localStorage.getItem(getStorageKey('activeTimers'));
+      if (savedTimers) {
+        const timersData = JSON.parse(savedTimers);
+        setActiveTimers(new Map(Object.entries(timersData)));
+      }
+    } catch (error) {
+      console.warn('Failed to load cooking state from localStorage:', error);
+    }
+  }, [params?.mealId, getStorageKey]);
+
+  // Helper functions to save to localStorage
+  const saveCurrentStep = (stepIndex: number) => {
+    if (typeof window !== 'undefined' && params?.mealId) {
+      localStorage.setItem(getStorageKey('currentStep'), stepIndex.toString());
+    }
+  };
+
+  const saveCompletedSteps = (steps: Set<string>) => {
+    if (typeof window !== 'undefined' && params?.mealId) {
+      localStorage.setItem(getStorageKey('completedSteps'), JSON.stringify([...steps]));
+    }
+  };
+
+  const saveActiveTimers = (timers: Map<string, number>) => {
+    if (typeof window !== 'undefined' && params?.mealId) {
+      const timersObject = Object.fromEntries(timers);
+      localStorage.setItem(getStorageKey('activeTimers'), JSON.stringify(timersObject));
+    }
+  };
+
   // Load meal and recipe data
   useEffect(() => {
     const loadRecipeData = async () => {
-      const encodedMealId = params.mealId as string;
+      const encodedMealId = params?.mealId as string;
       const mealId = decodeURIComponent(encodedMealId);
       
       if (!mealId) {
@@ -236,7 +290,7 @@ export default function CookingStepsPage() {
     };
 
     loadRecipeData();
-  }, [params.mealId, getLikedMealById, contextLoading, likedMeals]);
+  }, [params?.mealId, getLikedMealById, contextLoading, likedMeals]);
 
   // Timer management
   useEffect(() => {
@@ -298,10 +352,13 @@ export default function CookingStepsPage() {
   const handleTrackSelect = (trackId: string) => {
     setSelectedTrackId(trackId);
     setCurrentStepIndex(0);
+    saveCurrentStep(0);
   };
 
   const startTimer = (stepId: string, minutes: number) => {
-    setActiveTimers(prev => new Map(prev).set(stepId, minutes * 60));
+    const newTimers = new Map(activeTimers).set(stepId, minutes * 60);
+    setActiveTimers(newTimers);
+    saveActiveTimers(newTimers);
   };
 
   const formatTime = (seconds: number): string => {
@@ -557,6 +614,7 @@ export default function CookingStepsPage() {
                                     const newTimers = new Map(activeTimers);
                                     newTimers.delete(step.step_id);
                                     setActiveTimers(newTimers);
+                                    saveActiveTimers(newTimers);
                                   }}
                                 >
                                   <RotateCcw className="h-4 w-4" />
@@ -595,11 +653,16 @@ export default function CookingStepsPage() {
                         {!completedSteps.has(step.step_id) && (
                           <Button
                             onClick={() => {
-                              setCompletedSteps(prev => new Set(prev).add(step.step_id));
+                              const newCompletedSteps = new Set(completedSteps).add(step.step_id);
+                              setCompletedSteps(newCompletedSteps);
+                              saveCompletedSteps(newCompletedSteps);
+                              
                               // Auto advance to next step if not the last one
                               if (index < currentTrack.steps.length - 1) {
                                 setTimeout(() => {
-                                  setCurrentStepIndex(index + 1);
+                                  const newStepIndex = index + 1;
+                                  setCurrentStepIndex(newStepIndex);
+                                  saveCurrentStep(newStepIndex);
                                 }, 500);
                               }
                             }}
@@ -636,7 +699,10 @@ export default function CookingStepsPage() {
               {currentTrack.steps.map((_, index) => (
                 <button
                   key={index}
-                  onClick={() => setCurrentStepIndex(index)}
+                  onClick={() => {
+                    setCurrentStepIndex(index);
+                    saveCurrentStep(index);
+                  }}
                   className={`w-2 h-2 rounded-full transition-all duration-300 ${
                     index === currentStepIndex
                       ? 'w-8 bg-gradient-to-r from-green-500 to-green-300'
