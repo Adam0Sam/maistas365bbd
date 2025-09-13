@@ -7,6 +7,7 @@ export interface FoodItem {
   pricePerUnit: string // e.g., "$2.50/lb", "$0.99/each"
   shopName: string
   isAvailable: boolean
+  isCompleted?: boolean // Track if meal has been cooked
   category?: string // Optional: e.g., "protein", "vegetable", "grain"
   nutritionInfo?: {
     calories?: number

@@ -43,9 +43,16 @@ export async function planRecipe({
    fields?: string[];
    limit?: number;
 }) {
+   console.log(`📝 [planRecipe] Starting individual recipe planning`);
+   console.log(`📝 [planRecipe] Recipe title: ${recipe.split('\n')[0]}`);
+   console.log(`📝 [planRecipe] Requirements: ${requirements}`);
+   console.log(`📝 [planRecipe] Fields: ${JSON.stringify(fields)}`);
+   console.log(`📝 [planRecipe] Limit: ${limit}`);
+   
    // 1) Extract ingredients
+   console.log(`🥕 [planRecipe] Step 1: Extracting ingredients...`);
    const extract = await openai.chat.completions.parse({
-      model: "gpt-5-mini-2025-08-07",
+      model: "gpt-4o-mini",
       messages: [
          {
             role: "system",
@@ -67,19 +74,32 @@ export async function planRecipe({
    const ingParsed = extract.choices[0].message?.parsed as
       | IngredientsResponse
       | undefined;
-   if (!ingParsed) throw new Error("Failed to parse ingredients");
+   
+   console.log(`🥕 [planRecipe] Ingredient extraction response:`, JSON.stringify(extract, null, 2));
+   
+   if (!ingParsed) {
+      console.log(`❌ [planRecipe] Failed to parse ingredients`);
+      throw new Error("Failed to parse ingredients");
+   }
 
    const ingredients = ingParsed.ingredients;
+   console.log(`✅ [planRecipe] Successfully extracted ${ingredients.length} ingredients`);
+   console.log(`🥕 [planRecipe] Ingredients:`, ingredients.map(i => i.name));
 
    // 2) Search Weaviate for candidates
+   console.log(`🔍 [planRecipe] Step 2: Searching for product candidates...`);
    const candidates = await searchCandidatesForIngredients(ingredients, {
       fields,
       limit,
    });
+   
+   console.log(`✅ [planRecipe] Found ${Array.isArray(candidates) ? candidates.length : 'N/A'} candidates`);
+   console.log(`🔍 [planRecipe] Candidates type:`, typeof candidates, Array.isArray(candidates) ? 'array' : 'object');
 
    // 3) Select shopping list
+   console.log(`🛒 [planRecipe] Step 3: Selecting products from candidates...`);
    const select = await openai.chat.completions.parse({
-      model: "gpt-5-mini-2025-08-07",
+      model: "gpt-4o-mini",
       messages: [
          {
             role: "system",
@@ -102,11 +122,29 @@ export async function planRecipe({
    const selection = select.choices[0].message?.parsed as
       | SelectionResponse
       | undefined;
-   if (!selection) throw new Error("Failed to parse selection");
-
-   return {
+   
+   console.log(`🛒 [planRecipe] Product selection response:`, JSON.stringify(select, null, 2));
+   
+   if (!selection) {
+      console.log(`❌ [planRecipe] Failed to parse selection`);
+      throw new Error("Failed to parse selection");
+   }
+   
+   console.log(`✅ [planRecipe] Successfully selected ${selection.shopping_list.length} products`);
+   console.log(`🛒 [planRecipe] Shopping list:`, selection.shopping_list.map(s => ({ ingredient: s.ingredient, product: s.chosen_product.name })));
+   
+   const result = {
       ingredients,
       candidates,
       shopping_list: selection.shopping_list,
    };
+   
+   console.log(`✅ [planRecipe] Recipe planning completed successfully`);
+   console.log(`📊 [planRecipe] Final result summary:`, {
+      ingredientCount: result.ingredients.length,
+      candidateCount: Array.isArray(result.candidates) ? result.candidates.length : 'object',
+      shoppingListCount: result.shopping_list.length
+   });
+   
+   return result;
 }

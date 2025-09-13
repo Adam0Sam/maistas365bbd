@@ -3,7 +3,7 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Heart, ShoppingBag, DollarSign, Trash2, ChefHat, Clock, Users, X } from 'lucide-react'
+import { ArrowLeft, Heart, ShoppingBag, DollarSign, Trash2, ChefHat, Clock, Users, X, Check, CheckCircle2 } from 'lucide-react'
 import { useLikedMeals } from '@/contexts/LikedMealsContext'
 import { FoodItem } from '@/types/food'
 import { useState, useEffect, useCallback } from 'react'
@@ -112,12 +112,13 @@ interface MealDataCache {
 }
 
 export default function LikedMeals({ onBack, onStartOver }: LikedMealsProps) {
-  const { likedMeals, removeLikedMeal, clearLikedMeals } = useLikedMeals()
+  const { likedMeals, removeLikedMeal, clearLikedMeals, markAsCompleted, markAsIncomplete, getUncompletedMeals } = useLikedMeals()
   const [selectedMeal, setSelectedMeal] = useState<FoodItem | null>(null)
   const [userStats, setUserStats] = useState({ totalRecipesGenerated: 0, totalRecipesLiked: 0 })
   const [isReturningUser, setIsReturningUser] = useState(false)
   const [mealDataCache, setMealDataCache] = useState<MealDataCache>({})
   const [loadingMeals, setLoadingMeals] = useState<Set<string>>(new Set())
+  const [showCompleted, setShowCompleted] = useState(false)
 
   useEffect(() => {
     const stats = getUserState()
@@ -160,7 +161,23 @@ export default function LikedMeals({ onBack, onStartOver }: LikedMealsProps) {
     setSelectedMeal(null)
   }
 
-  if (likedMeals.length === 0) {
+  const handleToggleCompleted = (meal: FoodItem) => {
+    if (meal.isCompleted) {
+      markAsIncomplete(meal.id)
+    } else {
+      markAsCompleted(meal.id)
+    }
+  }
+
+  // Filter meals based on completion status - always show uncompleted by default
+  const uncompletedMeals = getUncompletedMeals()
+  console.log("get uncompleted meals", uncompletedMeals)
+  const completedMeals = likedMeals.filter(meal => meal.isCompleted)
+  const displayedMeals = showCompleted ? completedMeals : uncompletedMeals
+
+  const completedMealsCount = likedMeals.filter(meal => meal.isCompleted).length
+
+  if (uncompletedMeals.length === 0 && !showCompleted) {
     return (
       <motion.div 
         initial={{ y: '100%' }}
@@ -192,12 +209,15 @@ export default function LikedMeals({ onBack, onStartOver }: LikedMealsProps) {
           >
             <div className="text-6xl mb-6">🍽️</div>
             <h2 className="text-2xl font-bold mb-4">
-              {isReturningUser ? 'Ready to discover more?' : 'No favorites yet!'}
+              {completedMealsCount > 0 ? 'All meals cooked!' : (isReturningUser ? 'Ready to discover more?' : 'No favorites yet!')}
             </h2>
             <p className="text-muted-foreground mb-8">
-              {isReturningUser 
-                ? `You've explored ${userStats.totalRecipesGenerated} recipes so far. Let's find more delicious meals!`
-                : "Start swiping to discover meals you'll love and they'll appear here."
+              {completedMealsCount > 0
+                ? `Great job! You've cooked ${completedMealsCount} meals. Time to discover new recipes!`
+                : (isReturningUser 
+                  ? `You've explored ${userStats.totalRecipesGenerated} recipes so far. Let's find more delicious meals!`
+                  : "Start swiping to discover meals you'll love and they'll appear here."
+                )
               }
             </p>
             <Button onClick={onStartOver} size="lg">
@@ -227,22 +247,32 @@ export default function LikedMeals({ onBack, onStartOver }: LikedMealsProps) {
         
         <div className="text-center">
           <h1 className="text-xl font-bold">
-            {isReturningUser ? 'Welcome Back!' : 'Your Favorites'}
+            {showCompleted ? 'Completed Meals' : 'Meals to Cook'}
           </h1>
           <p className="text-sm text-muted-foreground">
-            {likedMeals.length} saved • {userStats.totalRecipesGenerated} recipes explored
+            {uncompletedMeals.length} to cook • {completedMeals.length} completed • {userStats.totalRecipesGenerated} explored
           </p>
         </div>
 
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={clearLikedMeals}
-          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-        >
-          <Trash2 className="h-4 w-4 mr-2" />
-          Clear
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant={showCompleted ? "default" : "outline"}
+            size="sm" 
+            onClick={() => setShowCompleted(!showCompleted)}
+          >
+            <CheckCircle2 className="h-4 w-4 mr-2" />
+            {showCompleted ? "Show To Cook" : "Show Cooked"}
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={clearLikedMeals}
+            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Clear
+          </Button>
+        </div>
       </div>
 
       {/* Grid Layout */}
@@ -250,13 +280,15 @@ export default function LikedMeals({ onBack, onStartOver }: LikedMealsProps) {
         <div className="max-w-6xl mx-auto p-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             <AnimatePresence>
-              {likedMeals.map((meal, index) => (
+              {displayedMeals.map((meal, index) => (
                 <GridMealCard
                   key={meal.id}
                   meal={meal}
                   index={index}
                   onClick={() => handleCardClick(meal)}
                   onRemove={() => removeLikedMeal(meal.id)}
+                  onToggleCompleted={() => handleToggleCompleted(meal)}
+                  isCompleted={meal.isCompleted || false}
                 />
               ))}
             </AnimatePresence>
@@ -290,6 +322,10 @@ export default function LikedMeals({ onBack, onStartOver }: LikedMealsProps) {
               removeLikedMeal(selectedMeal.id)
               handleCloseModal()
             }}
+            onToggleCompleted={() => {
+              handleToggleCompleted(selectedMeal)
+              handleCloseModal()
+            }}
           />
         )}
       </AnimatePresence>
@@ -302,9 +338,11 @@ interface GridMealCardProps {
   index: number
   onClick: () => void
   onRemove: () => void
+  onToggleCompleted: () => void
+  isCompleted: boolean
 }
 
-function GridMealCard({ meal, index, onClick, onRemove }: GridMealCardProps) {
+function GridMealCard({ meal, index, onClick, onRemove, onToggleCompleted, isCompleted }: GridMealCardProps) {
   const displayPrice = typeof meal.price === 'number' ? meal.price.toFixed(2) : '0.00'
   const estimatedTime = Math.floor(Math.random() * 30) + 15
   
@@ -327,14 +365,21 @@ function GridMealCard({ meal, index, onClick, onRemove }: GridMealCardProps) {
       onClick={onClick}
     >
       {/* Card Image */}
-      <div className="h-32 bg-gradient-to-br from-orange-50 to-red-50 flex items-center justify-center relative">
+      <div className={`h-32 flex items-center justify-center relative ${isCompleted ? 'bg-gradient-to-br from-green-50 to-green-100' : 'bg-gradient-to-br from-orange-50 to-red-50'}`}>
         <div className="text-4xl opacity-80">
-          {meal.category === 'recipe' ? '👨‍🍳' : '🍽️'}
+          {isCompleted ? '✅' : (meal.category === 'recipe' ? '👨‍🍳' : '🍽️')}
         </div>
-        {meal.category === 'recipe' && (
+        {meal.category === 'recipe' && !isCompleted && (
           <div className="absolute top-2 right-2">
             <Badge variant="outline" className="text-xs bg-white/80 backdrop-blur-sm">
               Recipe
+            </Badge>
+          </div>
+        )}
+        {isCompleted && (
+          <div className="absolute top-2 right-2">
+            <Badge className="text-xs bg-green-600">
+              Cooked
             </Badge>
           </div>
         )}
@@ -342,20 +387,41 @@ function GridMealCard({ meal, index, onClick, onRemove }: GridMealCardProps) {
 
       {/* Card Content */}
       <div className="p-4 space-y-3">
-        {/* Title and Remove Button */}
+        {/* Title and Action Buttons */}
         <div className="flex items-start gap-2">
-          <h3 className="text-lg font-bold line-clamp-2 flex-1 leading-tight">
+          <h3 className={`text-lg font-bold line-clamp-2 flex-1 leading-tight ${isCompleted ? 'line-through opacity-60' : ''}`}>
             {meal.name}
           </h3>
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              onRemove()
-            }}
-            className="p-1.5 rounded-full hover:bg-red-100 text-red-500 opacity-60 hover:opacity-100 transition-all duration-200 flex-shrink-0 mt-0.5"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
+          <div className="flex gap-1">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                onToggleCompleted()
+              }}
+              className={`p-1.5 rounded-full transition-all duration-200 flex-shrink-0 mt-0.5 ${
+                isCompleted 
+                  ? 'hover:bg-orange-100 text-orange-500 opacity-100' 
+                  : 'hover:bg-green-100 text-green-600 opacity-60 hover:opacity-100'
+              }`}
+              title={isCompleted ? 'Mark as not cooked' : 'Mark as cooked'}
+              aria-label={isCompleted ? 'Mark as not cooked' : 'Mark as cooked'}
+            >
+              <Check className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                onRemove()
+              }}
+              className="p-1.5 rounded-full hover:bg-red-100 text-red-500 opacity-60 hover:opacity-100 transition-all duration-200 flex-shrink-0 mt-0.5"
+              title="Remove meal"
+              aria-label="Remove meal"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
         </div>
         
         {/* Category and Price Row */}
@@ -402,9 +468,10 @@ interface MealModalProps {
   isLoading: boolean
   onClose: () => void
   onRemove: () => void
+  onToggleCompleted: () => void
 }
 
-function MealModal({ meal, mealData, isLoading, onClose, onRemove }: MealModalProps) {
+function MealModal({ meal, mealData, isLoading, onClose, onRemove, onToggleCompleted }: MealModalProps) {
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty) {
       case 'Easy': return 'text-green-600 bg-green-100'
@@ -414,7 +481,7 @@ function MealModal({ meal, mealData, isLoading, onClose, onRemove }: MealModalPr
     }
   }
 
-  const totalIngredientPrice = mealData?.ingredients.reduce((sum: number, ing: any) => sum + (ing.price || 0), 0) || 0
+  const totalIngredientPrice = mealData?.ingredients.reduce((sum: number, ing: {price: number}) => sum + (ing.price || 0), 0) || 0
 
   return (
     <motion.div
@@ -466,6 +533,15 @@ function MealModal({ meal, mealData, isLoading, onClose, onRemove }: MealModalPr
             </div>
           </div>
           <div className="flex gap-2 ml-4">
+            <Button
+              variant={meal.isCompleted ? "default" : "outline"}
+              size="sm"
+              onClick={onToggleCompleted}
+              className={meal.isCompleted ? "bg-green-600 hover:bg-green-700" : "text-green-600 hover:text-green-700 hover:bg-green-50"}
+            >
+              <Check className="h-4 w-4" />
+              {meal.isCompleted ? "Cooked" : "Mark Cooked"}
+            </Button>
             <Button
               variant="outline"
               size="sm"

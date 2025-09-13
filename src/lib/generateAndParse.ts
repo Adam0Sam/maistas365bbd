@@ -20,7 +20,7 @@ const GeneratedRecipeSchema = z.object({
    instructions: z.array(z.string()).min(2),
 });
 const GeneratedRecipesResponseSchema = z.object({
-   recipes: z.array(GeneratedRecipeSchema).length(6),
+   recipes: z.array(GeneratedRecipeSchema).min(1).max(12),
 });
 export type GeneratedRecipe = z.infer<typeof GeneratedRecipeSchema>;
 export type GeneratedRecipesResponse = z.infer<
@@ -52,16 +52,23 @@ export async function generateAndPlanRecipes({
    requirements,
    prompt,
    fields,
-   limit,
+   limit = 6,
 }: BatchPlanInput): Promise<PlannedRecipeResult[]> {
-   // 1) Generate 6 recipes in strict JSON (1 API call)
+   console.log(`🍳 [generateAndPlanRecipes] Starting with parameters:`);
+   console.log(`🍳 [generateAndPlanRecipes] - requirements: ${requirements}`);
+   console.log(`🍳 [generateAndPlanRecipes] - prompt: ${prompt}`);
+   console.log(`🍳 [generateAndPlanRecipes] - fields: ${JSON.stringify(fields)}`);
+   console.log(`🍳 [generateAndPlanRecipes] - limit: ${limit}`);
+   
+   // 1) Generate recipes in strict JSON (1 API call)
+   console.log(`🤖 [generateAndPlanRecipes] Calling OpenAI to generate ${limit} recipes...`);
    const gen = await openai.chat.completions.parse({
-      model: "gpt-5-mini-2025-08-07",
+      model: "gpt-4o-mini",
       messages: [
          {
             role: "system",
             content:
-               "Generate 6 diverse, practical recipes. Each must include a concise ingredient list with quantities and step-by-step instructions. Respond in strict JSON.",
+               `Generate ${limit} diverse, practical recipes. Each must include a concise ingredient list with quantities and step-by-step instructions. Respond in strict JSON.`,
          },
          {
             role: "user",
@@ -70,7 +77,7 @@ export async function generateAndPlanRecipes({
                prompt:
                   prompt ??
                   "Weeknight-friendly, ~30–45 min, balanced nutrition.",
-               count: 6,
+               count: limit,
             }),
          },
       ],
@@ -83,10 +90,21 @@ export async function generateAndPlanRecipes({
    const parsed = gen.choices[0].message?.parsed as
       | GeneratedRecipesResponse
       | undefined;
-   if (!parsed) throw new Error("Failed to generate recipes");
+   console.log(`🤖 [generateAndPlanRecipes] OpenAI response received`);
+   console.log(`🤖 [generateAndPlanRecipes] Raw OpenAI response:`, JSON.stringify(gen, null, 2));
+   
+   if (!parsed) {
+      console.log(`❌ [generateAndPlanRecipes] Failed to parse OpenAI response`);
+      throw new Error("Failed to generate recipes");
+   }
+   
+   console.log(`✅ [generateAndPlanRecipes] Successfully parsed ${parsed.recipes.length} recipes`);
+   console.log(`🍳 [generateAndPlanRecipes] Generated recipes:`, parsed.recipes.map(r => ({ title: r.title, ingredients: r.ingredients.length })));
 
    // 2) Process all recipes in batch (only 2 more API calls total instead of 12)
+   console.log(`📦 [generateAndPlanRecipes] Starting batch processing...`);
    try {
+      console.log(`📦 [generateAndPlanRecipes] Calling processBatchRecipes with ${parsed.recipes.length} recipes`);
       const batchResults = await processBatchRecipes(
          parsed.recipes,
          requirements,
@@ -94,13 +112,22 @@ export async function generateAndPlanRecipes({
          limit
       );
       
+      console.log(`✅ [generateAndPlanRecipes] Batch processing completed successfully`);
+      console.log(`📦 [generateAndPlanRecipes] Batch results summary:`, {
+         total: batchResults.length,
+         successful: batchResults.filter(r => r.ok).length,
+         failed: batchResults.filter(r => !r.ok).length
+      });
+      
       return batchResults;
    } catch (error) {
-      console.error("Batch processing failed, falling back to individual processing:", error);
+      console.error("❌ [generateAndPlanRecipes] Batch processing failed, falling back to individual processing:", error);
       
       // Fallback to individual processing if batch fails
+      console.log(`🔄 [generateAndPlanRecipes] Starting fallback individual processing for ${parsed.recipes.length} recipes`);
       const results = await Promise.allSettled(
-         parsed.recipes.map(async (r) => {
+         parsed.recipes.map(async (r, index) => {
+            console.log(`🔄 [generateAndPlanRecipes] Processing individual recipe ${index + 1}/${parsed.recipes.length}: ${r.title}`);
             const recipeText =
                `Title: ${r.title}\n` +
                (r.description ? `Description: ${r.description}\n` : "") +
@@ -114,13 +141,15 @@ export async function generateAndPlanRecipes({
                `\nInstructions:\n` +
                r.instructions.map((step, idx) => `${idx + 1}. ${step}`).join("\n");
 
+            console.log(`📝 [generateAndPlanRecipes] Calling planRecipe for: ${r.title}`);
             const plan = await planRecipe({
                recipe: recipeText,
                requirements,
                fields,
                limit,
             });
-
+            
+            console.log(`✅ [generateAndPlanRecipes] Successfully planned recipe: ${r.title}`);
             return {
                ok: true as const,
                title: r.title,
@@ -131,15 +160,26 @@ export async function generateAndPlanRecipes({
       );
 
       // Normalize fulfilled/rejected into a single array
+      console.log(`🔄 [generateAndPlanRecipes] Processing ${results.length} individual results...`);
       const normalized: PlannedRecipeResult[] = results.map((res, idx) => {
          const g = parsed.recipes[idx];
-         if (res.status === "fulfilled") return res.value;
+         if (res.status === "fulfilled") {
+            console.log(`✅ [generateAndPlanRecipes] Recipe ${idx + 1} (${g.title}) processed successfully`);
+            return res.value;
+         }
+         console.log(`❌ [generateAndPlanRecipes] Recipe ${idx + 1} (${g.title}) failed:`, res.reason?.message);
          return {
             ok: false,
             title: g.title,
             generated: g,
             error: res.reason?.message ?? "Unknown error",
          };
+      });
+      
+      console.log(`🔄 [generateAndPlanRecipes] Fallback processing complete:`, {
+         total: normalized.length,
+         successful: normalized.filter(r => r.ok).length,
+         failed: normalized.filter(r => !r.ok).length
       });
 
       return normalized;

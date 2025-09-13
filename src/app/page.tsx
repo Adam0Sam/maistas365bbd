@@ -56,6 +56,10 @@ function HomeContent() {
     setError(null)
     
     try {
+      // Add timeout with AbortController
+      const controller = new AbortController()
+      // const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+      
       const response = await fetch('/api/chat/generateBatch', {
         method: 'POST',
         headers: {
@@ -65,29 +69,50 @@ function HomeContent() {
           requirements: query,
           prompt: 'Create diverse, practical recipes that can be prepared at home',
           fields: ['productId', 'name', 'price', 'shop', 'available', 'image'],
-          limit: 8
-        })
+          limit: 2
+        }),
+        signal: controller.signal
       })
       
+      // clearTimeout(timeoutId)
+      
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
+        const errorText = await response.text().catch(() => '')
+        throw new Error(`Recipe generation failed: ${response.status} ${response.statusText}${errorText ? ` - ${errorText}` : ''}`)
       }
       
       const results: PlannedRecipeResult[] = await response.json()
       
-      // Save recipes to local storage
-      saveRecipesToStorage(results)
+      // Filter out failed recipes and handle partial success
+      const successfulRecipes = results.filter(r => r.ok)
+      if (successfulRecipes.length === 0) {
+        throw new Error('All recipe generations failed. Please try again with different requirements.')
+      }
+      
+      // Notify user if some recipes failed
+      if (successfulRecipes.length < results.length) {
+        const failedCount = results.length - successfulRecipes.length
+        console.warn(`${failedCount} recipe(s) failed to generate properly`)
+      }
+      // Save only successful recipes to local storage
+      saveRecipesToStorage(successfulRecipes)
       
       // Update user state
-      incrementRecipesGenerated(results.length)
+      incrementRecipesGenerated(successfulRecipes.length)
       markUserAsReturning()
       
-      setGeneratedRecipes(results)
+      setGeneratedRecipes(successfulRecipes)
       setShowSwiper(true)
       setShowLikedMeals(false) // Hide liked meals when showing new recipes
-    } catch (err) {
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        setError('Request timed out. Please try again with simpler requirements.')
+      } else if (err instanceof Error) {
+        setError(err.message)
+      } else {
+        setError('An unexpected error occurred. Please try again.')
+      }
       console.error('Recipe generation failed:', err)
-      setError(err instanceof Error ? err.message : 'Failed to generate recipes')
     } finally {
       setIsSearching(false)
     }
