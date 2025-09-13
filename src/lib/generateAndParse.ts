@@ -16,6 +16,9 @@ const GeneratedRecipeSchema = z.object({
    title: z.string(),
    description: z.string(),
    servings: z.number(),
+   prep_time_minutes: z.number().min(1).max(120),
+   cook_time_minutes: z.number().min(1).max(240),
+   total_time_minutes: z.number().min(1).max(360),
    ingredients: z.array(GeneratedIngredientSchema).min(3),
    instructions: z.array(z.string()).min(2),
 });
@@ -54,7 +57,13 @@ export async function generateRecipes({
          {
             role: "system",
             content:
-               `Generate ${limit} diverse, practical recipes. Each must include a concise ingredient list with quantities and step-by-step instructions. Respond in strict JSON.`,
+               `Generate ${limit} diverse, practical recipes. Each must include:
+               - A concise ingredient list with realistic quantities
+               - Step-by-step cooking instructions
+               - Accurate timing information: prep_time_minutes (active preparation), cook_time_minutes (cooking/baking), and total_time_minutes (prep + cook)
+               - Realistic serving sizes
+               
+               Focus on achievable recipes with accurate timing based on the actual cooking methods used. Respond in strict JSON format.`,
          },
          {
             role: "user",

@@ -54,8 +54,9 @@ export default function CookPage() {
 
     setMeal(foundMeal);
 
-    // Convert FoodItem recipeData to ParsedRecipe format
+    // Convert FoodItem data to ParsedRecipe format
     if (foundMeal.recipeData) {
+      // Full recipe data with ingredients
       const convertedRecipe: ParsedRecipe = {
         info: {
           title: foundMeal.recipeData.generated.title || foundMeal.name,
@@ -87,6 +88,47 @@ export default function CookPage() {
             title: foundMeal.name,
             emoji: "🍽️",
             steps: foundMeal.recipeData.generated.instructions.map((instruction, index) => ({
+              step_id: `step_${index + 1}`,
+              number: index + 1,
+              instruction,
+              duration_minutes: instruction.includes("cook") || instruction.includes("bake") ? 
+                Math.floor(Math.random() * 10) + 5 : null
+            }))
+          }
+        ],
+        joins: [],
+        warnings: []
+      };
+
+      setRecipe(convertedRecipe);
+      setGraph(basicGraph);
+    } else if (foundMeal.basicRecipe) {
+      // Basic recipe data without ingredients - ingredients will be loaded separately
+      const convertedRecipe: ParsedRecipe = {
+        info: {
+          title: foundMeal.basicRecipe.title || foundMeal.name,
+          description: foundMeal.basicRecipe.description,
+          servings: foundMeal.basicRecipe.servings,
+          prep_minutes: 10,
+          cook_minutes: 20,
+          total_minutes: 30,
+          difficulty: "medium" as const
+        },
+        ingredients: [], // Empty initially - will be loaded when needed
+        steps: foundMeal.basicRecipe.instructions.map((instruction, index) => ({
+          instruction,
+          number: index + 1
+        }))
+      };
+
+      // Create a basic graph structure from basic recipe
+      const basicGraph: StepGraph = {
+        tracks: [
+          {
+            track_id: "main",
+            title: foundMeal.name,
+            emoji: "🍽️",
+            steps: foundMeal.basicRecipe.instructions.map((instruction, index) => ({
               step_id: `step_${index + 1}`,
               number: index + 1,
               instruction,
@@ -477,90 +519,117 @@ function IngredientsModal({
 
         {/* Ingredients List */}
         <div className="p-6 max-h-96 overflow-y-auto">
-          <div className="space-y-3">
-            {recipe.ingredients.map((ingredient, index) => {
-              const isSelected = selectedIngredients.has(index);
-              const isCore = ingredient.core;
+          {recipe.ingredients.length > 0 ? (
+            <div className="space-y-3">
+              {recipe.ingredients.map((ingredient, index) => {
+                const isSelected = selectedIngredients.has(index);
+                const isCore = ingredient.core;
 
-              return (
-                <motion.button
-                  key={index}
-                  onClick={() => onToggleIngredient(index)}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                  className={`w-full flex items-center gap-4 p-4 rounded-2xl border-2 transition-all duration-300 group ${
-                    isSelected
-                      ? 'border-green-300 shadow-lg'
-                      : 'bg-neutral-50 border-neutral-200 hover:border-primary-200 hover:bg-primary-25'
-                  }`}
-                  style={isSelected ? {
-                    background: 'linear-gradient(90deg, rgba(76, 159, 112, 0.1) 0%, rgba(84, 105, 164, 0.1) 100%)'
-                  } : {}}
-                >
-                  {/* Checkbox */}
-                  <div 
-                    className={`relative flex items-center justify-center w-6 h-6 rounded-lg border-2 transition-all duration-300 ${
+                return (
+                  <motion.button
+                    key={index}
+                    onClick={() => onToggleIngredient(index)}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                    className={`w-full flex items-center gap-4 p-4 rounded-2xl border-2 transition-all duration-300 group ${
                       isSelected
-                        ? 'border-transparent'
-                        : 'border-neutral-300 group-hover:border-primary-400'
+                        ? 'border-green-300 shadow-lg'
+                        : 'bg-neutral-50 border-neutral-200 hover:border-primary-200 hover:bg-primary-25'
                     }`}
                     style={isSelected ? {
-                      background: 'linear-gradient(90deg, #4c9f70 0%, #6279b8 100%)'
+                      background: 'linear-gradient(90deg, rgba(76, 159, 112, 0.1) 0%, rgba(84, 105, 164, 0.1) 100%)'
                     } : {}}
                   >
-                    <AnimatePresence>
-                      {isSelected && (
-                        <motion.div
-                          initial={{ scale: 0, opacity: 0 }}
-                          animate={{ scale: 1, opacity: 1 }}
-                          exit={{ scale: 0, opacity: 0 }}
-                        >
-                          <Check className="h-4 w-4 text-white" />
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-
-                  {/* Ingredient Info */}
-                  <div className="flex-1 text-left">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className={`font-semibold transition-colors ${
-                        isSelected ? 'text-primary-800' : 'text-neutral-800 group-hover:text-primary-700'
-                      }`}>
-                        {ingredient.name}
-                      </h3>
-                      {isCore && (
-                        <Badge 
-                          className="text-white text-xs"
-                          style={{ background: 'linear-gradient(90deg, #6279b8 0%, #5469a4 100%)' }}
-                        >
-                          Essential
-                        </Badge>
-                      )}
+                    {/* Checkbox */}
+                    <div 
+                      className={`relative flex items-center justify-center w-6 h-6 rounded-lg border-2 transition-all duration-300 ${
+                        isSelected
+                          ? 'border-transparent'
+                          : 'border-neutral-300 group-hover:border-primary-400'
+                      }`}
+                      style={isSelected ? {
+                        background: 'linear-gradient(90deg, #4c9f70 0%, #6279b8 100%)'
+                      } : {}}
+                    >
+                      <AnimatePresence>
+                        {isSelected && (
+                          <motion.div
+                            initial={{ scale: 0, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0, opacity: 0 }}
+                          >
+                            <Check className="h-4 w-4 text-white" />
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
-                    <p className={`text-sm transition-colors ${
-                      isSelected ? 'text-primary-600' : 'text-neutral-600'
-                    }`}>
-                      {ingredient.quantity} {ingredient.unit}
-                    </p>
-                  </div>
 
-                  {/* Selection Indicator */}
-                  <div 
-                    className={`w-3 h-3 rounded-full transition-all duration-300 ${
-                      isSelected
-                        ? 'shadow-lg'
-                        : 'bg-neutral-300 group-hover:bg-primary-400'
-                    }`}
-                    style={isSelected ? {
-                      background: 'linear-gradient(90deg, #4c9f70 0%, #6279b8 100%)'
-                    } : {}}
-                  />
-                </motion.button>
-              );
-            })}
-          </div>
+                    {/* Ingredient Info */}
+                    <div className="flex-1 text-left">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className={`font-semibold transition-colors ${
+                          isSelected ? 'text-primary-800' : 'text-neutral-800 group-hover:text-primary-700'
+                        }`}>
+                          {ingredient.name}
+                        </h3>
+                        {isCore && (
+                          <Badge 
+                            className="text-white text-xs"
+                            style={{ background: 'linear-gradient(90deg, #6279b8 0%, #5469a4 100%)' }}
+                          >
+                            Essential
+                          </Badge>
+                        )}
+                      </div>
+                      <p className={`text-sm transition-colors ${
+                        isSelected ? 'text-primary-600' : 'text-neutral-600'
+                      }`}>
+                        {ingredient.quantity} {ingredient.unit}
+                      </p>
+                    </div>
+
+                    {/* Selection Indicator */}
+                    <div 
+                      className={`w-3 h-3 rounded-full transition-all duration-300 ${
+                        isSelected
+                          ? 'shadow-lg'
+                          : 'bg-neutral-300 group-hover:bg-primary-400'
+                      }`}
+                      style={isSelected ? {
+                        background: 'linear-gradient(90deg, #4c9f70 0%, #6279b8 100%)'
+                      } : {}}
+                    />
+                  </motion.button>
+                );
+              })}
+            </div>
+          ) : (
+            // Empty ingredients state - will be loaded when cooking starts
+            <div className="text-center py-8">
+              <motion.div
+                initial={{ scale: 0, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+                className="mb-4"
+              >
+                <div className="text-6xl mb-4">🛒</div>
+                <h3 className="text-xl font-semibold mb-2 text-neutral-800">
+                  Ingredients Loading Later
+                </h3>
+                <p className="text-neutral-600 mb-4 max-w-md mx-auto">
+                  We'll help you find the best ingredients and prices when you start cooking this recipe.
+                </p>
+                <div className="flex items-center justify-center gap-2 text-sm text-neutral-500">
+                  <div className="w-2 h-2 rounded-full bg-primary-400"></div>
+                  <span>Smart ingredient selection</span>
+                  <div className="w-2 h-2 rounded-full bg-primary-400"></div>
+                  <span>Best prices</span>
+                  <div className="w-2 h-2 rounded-full bg-primary-400"></div>
+                </div>
+              </motion.div>
+            </div>
+          )}
         </div>
 
         {/* Footer */}
@@ -575,15 +644,18 @@ function IngredientsModal({
             </Button>
             <Button
               onClick={onStartCooking}
-              disabled={selectedCount === 0}
+              disabled={recipe.ingredients.length > 0 && selectedCount === 0}
               className="flex-1 h-12 text-white disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
               style={{ 
-                background: selectedCount === 0 ? '#94a3b8' : 'linear-gradient(90deg, #3d8059 0%, #5469a4 100%)',
+                background: (recipe.ingredients.length > 0 && selectedCount === 0) ? '#94a3b8' : 'linear-gradient(90deg, #3d8059 0%, #5469a4 100%)',
                 transition: 'background 0.3s ease'
               }}
             >
               <ChefHat className="h-4 w-4 mr-2" />
-              Start Cooking ({selectedCount})
+              {recipe.ingredients.length === 0 
+                ? "Start Cooking & Load Ingredients"
+                : `Start Cooking (${selectedCount})`
+              }
             </Button>
           </div>
         </div>

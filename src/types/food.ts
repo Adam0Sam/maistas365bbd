@@ -1,21 +1,39 @@
 import { GeneratedRecipe } from "@/lib/generateAndParse"
 
+// Basic recipe info that comes from initial batch generation (without ingredients)
+export interface BasicRecipeInfo {
+  title: string
+  description: string
+  servings: number
+  instructions: string[]
+}
+
+// Full recipe with ingredients and shopping plan
+export interface FullRecipeData {
+  generated: GeneratedRecipe
+  plan: RecipePlan
+}
+
 export interface FoodItem {
   id: string
   name: string
   url: string // Links to shop website
   image: string // Image URL
+  price: number // Add price field
+  shopName?: string // Add shop name field
   isAvailable: boolean
   isCompleted?: boolean // Track if meal has been cooked
-  category?: string // Optional: e.g., "protein", "vegetable", "grain"
+  category?: string // Optional: e.g., "protein", "vegetable", "grain", "recipe"
   nutritionInfo?: {
     calories?: number
     protein?: number
     carbs?: number
     fat?: number
   }
-  // Full recipe data from generateBatch API (for liked recipes)
-  recipeData?: GeneratedRecipe
+  // Basic recipe info from initial batch (for recipes without ingredients)
+  basicRecipe?: BasicRecipeInfo
+  // Full recipe data with ingredients and shopping plan (loaded separately)
+  recipeData?: FullRecipeData
 }
 
 export interface Recipe {

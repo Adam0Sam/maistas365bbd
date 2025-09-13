@@ -86,55 +86,150 @@ interface LikedMealsProps {
   onStartOver: () => void
 }
 
-// Get meal data from stored recipeData (for recipes) or generate fallback (for food items)
+// Get meal data from stored recipeData or basicRecipe (for recipes) or generate fallback (for food items)
 const getMealData = async (meal: FoodItem) => {
-  // If this is a recipe with stored data, use it directly
+  // If this is a recipe with stored data, handle both old and new formats
   if (meal.recipeData) {
     console.log(`✅ Using stored recipe data for ${meal.name} - no API call needed!`);
-    const { generated, plan } = meal.recipeData;
     
-    // Transform the stored data to match the expected format
-    const ingredients = plan.shopping_list.map((item) => ({
-      name: item.chosen_product.name,
-      amount: plan.ingredients.find((ing) => 
-        ing.name.toLowerCase().includes(item.ingredient.toLowerCase())
-      )?.quantity || '1 unit',
-      price: item.chosen_product.price,
-      category: 'ingredient'
-    }));
-
-    // Calculate a reasonable difficulty based on ingredient count and instructions
-    const getDifficulty = () => {
-      const ingredientCount = generated.ingredients.length;
-      const instructionCount = generated.instructions.length;
+    // Check if it's the new format with generated and plan
+    if ('generated' in meal.recipeData && 'plan' in meal.recipeData) {
+      const { generated, plan } = meal.recipeData;
       
-      if (ingredientCount <= 5 && instructionCount <= 4) return 'Easy';
-      if (ingredientCount <= 10 && instructionCount <= 8) return 'Medium';
+      // Transform the stored data to match the expected format
+      const ingredients = plan.shopping_list.map((item) => ({
+        name: item.chosen_product.name,
+        amount: plan.ingredients.find((ing) => 
+          ing.name.toLowerCase().includes(item.ingredient.toLowerCase())
+        )?.quantity || '1 unit',
+        price: item.chosen_product.price,
+        category: 'ingredient'
+      }));
+
+      // Calculate a reasonable difficulty based on ingredient count and instructions
+      const getDifficulty = () => {
+        const ingredientCount = generated.ingredients.length;
+        const instructionCount = generated.instructions.length;
+        
+        if (ingredientCount <= 5 && instructionCount <= 4) return 'Easy';
+        if (ingredientCount <= 10 && instructionCount <= 8) return 'Medium';
+        return 'Hard';
+      };
+
+      return {
+        recipe: {
+          description: generated.description,
+          cookTime: generated.total_time_minutes || generated.cook_time_minutes || Math.min(15 + (generated.instructions.length * 5), 60),
+          servings: generated.servings,
+          difficulty: getDifficulty() as 'Easy' | 'Medium' | 'Hard',
+          instructions: generated.instructions
+        },
+        ingredients
+      };
+    } else {
+      // Handle old format where recipeData is directly the generated recipe
+      const generated = meal.recipeData as {
+        ingredients?: Array<{name: string; quantity: string}>;
+        instructions?: string[];
+        description?: string;
+        servings?: number;
+        title?: string;
+        total_time_minutes?: number;
+        cook_time_minutes?: number;
+        prep_time_minutes?: number;
+      };
+      
+      // Calculate a reasonable difficulty based on ingredient count and instructions
+      const getDifficulty = () => {
+        const ingredientCount = generated.ingredients?.length || 0;
+        const instructionCount = generated.instructions?.length || 0;
+        
+        if (ingredientCount <= 5 && instructionCount <= 4) return 'Easy';
+        if (ingredientCount <= 10 && instructionCount <= 8) return 'Medium';
+        return 'Hard';
+      };
+
+      // Create ingredients from the generated recipe ingredients
+      const ingredients = (generated.ingredients || []).map((ing, index: number) => ({
+        name: ing.name || 'Unknown ingredient',
+        amount: ing.quantity || '1 unit',
+        price: 0, // No price data available in old format - will be "FREE" in UI
+        category: index < 3 ? 'core' : 'ingredient'
+      }));
+
+      // Use actual cooking time if available, otherwise estimate
+      const cookTime = generated.total_time_minutes || 
+                      generated.cook_time_minutes || 
+                      Math.min(15 + ((generated.instructions?.length || 0) * 5), 60);
+
+      return {
+        recipe: {
+          description: generated.description || `A delicious ${meal.name} recipe`,
+          cookTime: cookTime,
+          servings: generated.servings || 4,
+          difficulty: getDifficulty() as 'Easy' | 'Medium' | 'Hard',
+          instructions: generated.instructions || [`Prepare ${meal.name}`, 'Cook and serve hot']
+        },
+        ingredients
+      };
+    }
+  }
+
+  // If this is a recipe with basic info (from initial batch), use that
+  if (meal.basicRecipe) {
+    console.log(`📋 Using basic recipe data for ${meal.name} - ingredients will be loaded separately`);
+    
+    // Calculate difficulty based on instructions count
+    const getDifficulty = () => {
+      const instructionCount = meal.basicRecipe!.instructions.length;
+      if (instructionCount <= 4) return 'Easy';
+      if (instructionCount <= 8) return 'Medium';
       return 'Hard';
     };
 
-    // Estimate cook time based on instructions (more instructions = longer cook time)
-    const estimatedCookTime = Math.min(15 + (generated.instructions.length * 5), 60);
+    // Try to extract cooking time from instructions if mentioned, otherwise estimate
+    const extractTimeFromInstructions = () => {
+      const instructions = meal.basicRecipe!.instructions.join(' ').toLowerCase();
+      const timeMatches = instructions.match(/(\d+)\s*(min|minute|hour)/gi);
+      if (timeMatches) {
+        let totalMinutes = 0;
+        timeMatches.forEach(match => {
+          const [, number, unit] = match.match(/(\d+)\s*(min|minute|hour)/i) || [];
+          const minutes = parseInt(number);
+          totalMinutes += unit.toLowerCase().includes('hour') ? minutes * 60 : minutes;
+        });
+        return Math.min(totalMinutes, 240); // Cap at 4 hours
+      }
+      return Math.min(15 + (meal.basicRecipe!.instructions.length * 5), 60);
+    };
 
     return {
       recipe: {
-        description: generated.description,
-        cookTime: estimatedCookTime,
-        servings: generated.servings,
+        description: meal.basicRecipe.description,
+        cookTime: extractTimeFromInstructions(),
+        servings: meal.basicRecipe.servings,
         difficulty: getDifficulty() as 'Easy' | 'Medium' | 'Hard',
-        instructions: generated.instructions
+        instructions: meal.basicRecipe.instructions
       },
-      ingredients
+      ingredients: [] // Empty ingredients array for basic recipes - will be loaded separately
     };
   }
   
-  // Fallback for regular food items (non-recipes) - no API call needed
+  // Fallback for regular food items (non-recipes) - provide reasonable estimates
+  const getEstimatedCookTime = () => {
+    const category = meal.category?.toLowerCase();
+    if (category?.includes('vegetable')) return 15;
+    if (category?.includes('meat') || category?.includes('protein')) return 25;
+    if (category?.includes('grain') || category?.includes('pasta')) return 20;
+    return 20; // Default reasonable cooking time
+  };
+
   return {
     recipe: {
       description: `A delicious ${meal.name} recipe that combines fresh ingredients with simple cooking techniques.`,
-      cookTime: Math.floor(Math.random() * 45) + 15,
-      servings: Math.floor(Math.random() * 4) + 2,
-      difficulty: ['Easy', 'Medium', 'Hard'][Math.floor(Math.random() * 3)] as 'Easy' | 'Medium' | 'Hard',
+      cookTime: getEstimatedCookTime(),
+      servings: 4, // Standard serving size
+      difficulty: 'Easy' as const, // Default to easy for simple items
       instructions: [
         'Prepare all ingredients by washing and chopping as needed',
         `Season the ${meal.name} with salt and pepper`,
@@ -145,7 +240,7 @@ const getMealData = async (meal: FoodItem) => {
       ]
     },
     ingredients: [
-      { name: meal.name, amount: '1 lb', price: meal.price, category: meal.category || 'main' },
+      { name: meal.name, amount: '1 lb', price: meal.price ?? 0, category: meal.category || 'main' },
       { name: 'Olive Oil', amount: '2 tbsp', price: 0.50, category: 'pantry' },
       { name: 'Salt', amount: '1 tsp', price: 0.10, category: 'seasoning' },
       { name: 'Black Pepper', amount: '1/2 tsp', price: 0.15, category: 'seasoning' }
@@ -163,6 +258,8 @@ export default function LikedMeals({ onBack, onStartOver }: LikedMealsProps) {
   const [userStats, setUserStats] = useState({ totalRecipesGenerated: 0, totalRecipesLiked: 0 })
   const [isReturningUser, setIsReturningUser] = useState(false)
   const [mealDataCache, setMealDataCache] = useState<MealDataCache>({})
+  console.log("Meal data cache: ", mealDataCache)
+  console.log("selectedmeal id: ", selectedMeal?.id)
   const [loadingMeals, setLoadingMeals] = useState<Set<string>>(new Set())
   const [showCompleted, setShowCompleted] = useState(false)
   const router = useRouter()
@@ -177,16 +274,30 @@ export default function LikedMeals({ onBack, onStartOver }: LikedMealsProps) {
   }, [])
 
   const fetchMealData = useCallback(async (meal: FoodItem) => {
-    if (mealDataCache[meal.id] || loadingMeals.has(meal.id)) {
-      return mealDataCache[meal.id]
+    // Check if already cached
+    const cached = mealDataCache[meal.id]
+    if (cached) {
+      console.log(`✅ Using cached data for ${meal.name}`)
+      return cached
     }
 
+    // Check if already loading
+    if (loadingMeals.has(meal.id)) {
+      console.log(`⏳ Already loading data for ${meal.name}`)
+      return
+    }
+
+    console.log(`🔄 Loading meal data for ${meal.name}`)
     setLoadingMeals(prev => new Set(prev).add(meal.id))
 
     try {
       const data = await getMealData(meal)
+      console.log(`📦 Caching meal data for ${meal.name}:`, data)
       setMealDataCache(prev => ({ ...prev, [meal.id]: data }))
       return data
+    } catch (error) {
+      console.error(`❌ Error fetching meal data for ${meal.name}:`, error)
+      throw error
     } finally {
       setLoadingMeals(prev => {
         const newSet = new Set(prev)
@@ -197,10 +308,17 @@ export default function LikedMeals({ onBack, onStartOver }: LikedMealsProps) {
   }, [mealDataCache, loadingMeals])
 
   const handleCardClick = async (meal: FoodItem) => {
+    console.log(`🎯 Card clicked for ${meal.name}, ID: ${meal.id}`)
+    console.log(`📋 Current cache keys:`, Object.keys(mealDataCache))
+    console.log(`🔍 Meal data in cache:`, !!mealDataCache[meal.id])
+    
     setSelectedMeal(meal)
-    // Pre-fetch meal data if not already cached
-    if (!mealDataCache[meal.id]) {
+    
+    // Always fetch meal data for the modal (it checks if already cached internally)
+    try {
       await fetchMealData(meal)
+    } catch (error) {
+      console.error(`❌ Failed to fetch meal data for ${meal.name}:`, error)
     }
   }
 
@@ -422,7 +540,6 @@ export default function LikedMeals({ onBack, onStartOver }: LikedMealsProps) {
               removeLikedMeal(selectedMeal.id)
               handleCloseModal()
             }}
-            onStartCooking={() => handleStartCooking(selectedMeal)}
           />
         )}
       </AnimatePresence>
@@ -474,8 +591,48 @@ interface GridMealCardProps {
 }
 
 function GridMealCard({ meal, index, onClick, onRemove, onToggleCompleted, isCompleted }: GridMealCardProps) {
-  const displayPrice = typeof meal.price === 'number' ? meal.price.toFixed(2) : '0.00'
-  const estimatedTime = Math.floor(Math.random() * 30) + 15
+  const displayPrice = meal.price !== undefined ? meal.price.toFixed(2) : null
+  
+  // Calculate cooking time based on meal data
+  const getEstimatedTime = () => {
+    // If we have full recipe data, use the actual cooking time
+    if (meal.recipeData) {
+      if ('generated' in meal.recipeData && 'plan' in meal.recipeData) {
+        return meal.recipeData.generated.total_time_minutes || meal.recipeData.generated.cook_time_minutes || 30;
+      } else {
+        const generated = meal.recipeData as {
+          total_time_minutes?: number;
+          cook_time_minutes?: number;
+        };
+        return generated.total_time_minutes || generated.cook_time_minutes || 30;
+      }
+    }
+    
+    // If we have basic recipe data, estimate from instructions
+    if (meal.basicRecipe) {
+      const instructions = meal.basicRecipe.instructions.join(' ').toLowerCase();
+      const timeMatches = instructions.match(/(\d+)\s*(min|minute|hour)/gi);
+      if (timeMatches) {
+        let totalMinutes = 0;
+        timeMatches.forEach(match => {
+          const [, number, unit] = match.match(/(\d+)\s*(min|minute|hour)/i) || [];
+          const minutes = parseInt(number);
+          totalMinutes += unit.toLowerCase().includes('hour') ? minutes * 60 : minutes;
+        });
+        return Math.min(totalMinutes, 240);
+      }
+      return Math.min(15 + (meal.basicRecipe.instructions.length * 5), 60);
+    }
+    
+    // Fallback based on category
+    const category = meal.category?.toLowerCase();
+    if (category?.includes('vegetable')) return 15;
+    if (category?.includes('meat') || category?.includes('protein')) return 25;
+    if (category?.includes('grain') || category?.includes('pasta')) return 20;
+    return 20;
+  };
+  
+  const estimatedTime = getEstimatedTime()
   
   return (
     <motion.div
@@ -565,12 +722,14 @@ function GridMealCard({ meal, index, onClick, onRemove, onToggleCompleted, isCom
           <Badge variant="secondary" className="text-xs px-2 py-1 truncate flex-shrink-0" style={{ maxWidth: '5rem' }}>
             {meal.category || 'food'}
           </Badge>
-          <div className="flex items-center gap-1 flex-shrink-0">
-            {/* <DollarSign className="h-3.5 w-3.5 text-green-600" /> */}
-            <span className="font-bold text-green-600 text-sm whitespace-nowrap">
-              ${displayPrice}
-            </span>
-          </div>
+          {displayPrice && (
+            <div className="flex items-center gap-1 flex-shrink-0">
+              {/* <DollarSign className="h-3.5 w-3.5 text-green-600" /> */}
+              <span className="font-bold text-green-600 text-sm whitespace-nowrap">
+                {displayPrice}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Shop Name */}
@@ -610,7 +769,7 @@ interface MealModalProps {
   onStartCooking: () => void
 }
 
-function MealModal({ meal, mealData, isLoading, onClose, onRemove, onStartCooking }: MealModalProps) {
+function MealModal({ meal, mealData, isLoading, onClose, onRemove }: Omit<MealModalProps, 'onStartCooking'>) {
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty) {
       case 'Easy': return 'text-green-600 bg-green-100'
@@ -645,10 +804,12 @@ function MealModal({ meal, mealData, isLoading, onClose, onRemove, onStartCookin
             <h2 className="text-2xl font-bold mb-2">{meal.name}</h2>
             <div className="flex items-center gap-4">
               <Badge variant="secondary">{meal.category}</Badge>
-              <div className="flex items-center gap-1">
-                {/* <DollarSign className="h-4 w-4 text-green-600" /> */}
-                <span className="font-semibold text-green-600">${typeof meal.price === 'number' ? meal.price.toFixed(2) : '0.00'}</span>
-              </div>
+              {meal.price !== undefined && (
+                <div className="flex items-center gap-1">
+                  {/* <DollarSign className="h-4 w-4 text-green-600" /> */}
+                  <span className="font-semibold text-green-600">${meal.price.toFixed(2)}</span>
+                </div>
+              )}
               {isLoading ? (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full"></div>
@@ -714,28 +875,52 @@ function MealModal({ meal, mealData, isLoading, onClose, onRemove, onStartCookin
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="font-semibold text-sm text-muted-foreground">INGREDIENTS</h4>
-                  <span className="text-sm font-bold text-green-600">
-                    Total: ${totalIngredientPrice.toFixed(2)}
-                  </span>
+                  {mealData.ingredients.length > 0 && totalIngredientPrice > 0 ? (
+                    <span className="text-sm font-bold text-green-600">
+                      Total: ${totalIngredientPrice.toFixed(2)}
+                    </span>
+                  ) : mealData.ingredients.length > 0 ? (
+                    <span className="text-sm text-muted-foreground font-medium">
+                      Price info unavailable
+                    </span>
+                  ) : (
+                    <span className="text-sm text-orange-600 font-medium">
+                      Available when cooking
+                    </span>
+                  )}
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  {mealData.ingredients.map((ingredient: {name: string; amount: string; price: number}, idx: number) => (
-                    <div key={idx} className="flex justify-between items-center p-3 bg-muted/30 rounded-lg">
-                      <div>
-                        <span className="text-sm font-medium">{ingredient.name}</span>
-                        <span className="text-xs text-muted-foreground ml-2">{ingredient.amount}</span>
+                {mealData.ingredients.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    {mealData.ingredients.map((ingredient: {name: string; amount: string; price: number}, idx: number) => (
+                      <div key={idx} className="flex justify-between items-center p-3 bg-muted/30 rounded-lg">
+                        <div className="flex-1">
+                          <span className="text-sm font-medium">{ingredient.name}</span>
+                          <span className="text-xs text-muted-foreground ml-2">{ingredient.amount}</span>
+                        </div>
+                        {ingredient.price > 0 && (
+                          <span className="text-xs font-semibold text-green-600">${ingredient.price.toFixed(2)}</span>
+                        )}
                       </div>
-                      <span className="text-xs font-semibold text-green-600">${ingredient.price.toFixed(2)}</span>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-6 bg-muted/20 rounded-lg text-center">
+                    <div className="text-2xl mb-2">🛒</div>
+                    <p className="text-sm text-muted-foreground mb-2">
+                      Ingredients will be loaded when you start cooking this recipe
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      We&apos;ll help you find the best ingredients and prices!
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Instructions */}
               <div>
                 <h4 className="font-semibold text-sm text-muted-foreground mb-3">INSTRUCTIONS</h4>
                 <ol className="space-y-3">
-                  {mealData.recipe.instructions.map((step, idx) => (
+                  {mealData.recipe.instructions.map((step: string, idx: number) => (
                     <li key={idx} className="text-sm flex gap-3">
                       <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs font-semibold flex-shrink-0 mt-0.5">
                         {idx + 1}

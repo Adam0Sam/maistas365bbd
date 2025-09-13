@@ -316,6 +316,7 @@ function HomeContent() {
       {/* Recipe Swiper */}
       {showSwiper && generatedRecipes.length > 0 && (
         <RecipeSwiper
+          key="recipe-swiper"
           recipes={generatedRecipes}
           onBack={handleBackToSearch}
           onShowLikedMeals={handleShowLikedMeals}
@@ -325,6 +326,7 @@ function HomeContent() {
       {/* Liked Meals */}
       {showLikedMeals && (
         <LikedMeals
+          key="liked-meals"
           onBack={handleBackToSearch}
           onStartOver={handleStartOver}
         />
