@@ -5,6 +5,7 @@ import { FoodItem } from '@/types/food'
 
 interface LikedMealsContextType {
   likedMeals: FoodItem[]
+  isLoading: boolean
   addLikedMeal: (meal: FoodItem) => void
   removeLikedMeal: (mealId: string) => void
   clearLikedMeals: () => void
@@ -13,6 +14,7 @@ interface LikedMealsContextType {
   markAsIncomplete: (mealId: string) => void
   getUncompletedMeals: () => FoodItem[]
   getCompletedMeals: () => FoodItem[]
+  getLikedMealById: (mealId: string) => FoodItem | undefined
 }
 
 const LikedMealsContext = createContext<LikedMealsContextType | undefined>(undefined)
@@ -21,6 +23,7 @@ const STORAGE_KEY = 'likedMeals'
 
 export function LikedMealsProvider({ children }: { children: ReactNode }) {
   const [likedMeals, setLikedMeals] = useState<FoodItem[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -34,6 +37,7 @@ export function LikedMealsProvider({ children }: { children: ReactNode }) {
         console.error('Failed to load liked meals from storage:', error)
       }
     }
+    setIsLoading(false)
   }, [])
 
   // Save to localStorage whenever likedMeals changes
@@ -88,6 +92,10 @@ export function LikedMealsProvider({ children }: { children: ReactNode }) {
     return likedMeals.filter(meal => meal.isCompleted)
   }
 
+  const getLikedMealById = (mealId: string) => {
+    return likedMeals.find(meal => meal.id === mealId)
+  }
+
   const value: LikedMealsContextType = {
     likedMeals,
     addLikedMeal,
@@ -98,6 +106,7 @@ export function LikedMealsProvider({ children }: { children: ReactNode }) {
     markAsIncomplete,
     getUncompletedMeals,
     getCompletedMeals,
+    getLikedMealById,
   }
 
   return (

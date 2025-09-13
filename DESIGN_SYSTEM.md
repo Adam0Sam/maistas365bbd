@@ -70,33 +70,61 @@ neutral-900: #0f172a   /* Text primary */
 ## 🎭 Gradients
 
 ### Signature Gradients
-Use these gradients to create visual interest and reinforce brand identity:
+Use these gradients to create visual interest and reinforce brand identity. Since Tailwind custom gradients don't work reliably, use inline styles:
 
 ```css
 /* Hero/Primary Gradient - Natural progression */
-bg-gradient-hero: linear-gradient(135deg, #8ea4d2 0%, #6279b8 25%, #49516f 50%, #496f5d 75%, #4c9f70 100%)
+background: linear-gradient(135deg, #8ea4d2 0%, #6279b8 25%, #49516f 50%, #496f5d 75%, #4c9f70 100%)
 
 /* Primary Gradient - Green focus */
-bg-gradient-primary: linear-gradient(135deg, #4c9f70 0%, #496f5d 100%)
+background: linear-gradient(90deg, #4c9f70 0%, #3d8059 100%)
 
 /* Secondary Gradient - Blue calming */
-bg-gradient-secondary: linear-gradient(135deg, #8ea4d2 0%, #6279b8 100%)
+background: linear-gradient(90deg, #8ea4d2 0%, #6279b8 100%)
 
 /* Accent Gradient - Professional depth */
-bg-gradient-accent: linear-gradient(135deg, #6279b8 0%, #49516f 100%)
+background: linear-gradient(90deg, #6279b8 0%, #5469a4 100%)
 
 /* Success Gradient - Health achievements */
-bg-gradient-success: linear-gradient(135deg, #4c9f70 0%, #8ea4d2 100%)
+background: linear-gradient(90deg, #4c9f70 0%, #8ea4d2 100%)
 
-/* Mesh Gradient - Complex backgrounds */
-bg-gradient-mesh: radial-gradient(circle at 20% 80%, #4c9f70 0%, transparent 50%), radial-gradient(circle at 80% 20%, #8ea4d2 0%, transparent 50%), radial-gradient(circle at 40% 40%, #6279b8 0%, transparent 50%)
+/* Light Background Gradients */
+background: linear-gradient(90deg, rgba(76, 159, 112, 0.1) 0%, rgba(84, 105, 164, 0.1) 100%)
+```
+
+### Gradient Implementation Examples
+```jsx
+// Primary button with gradient
+<button 
+  style={{ background: 'linear-gradient(90deg, #4c9f70 0%, #3d8059 100%)' }}
+  className="text-white px-6 py-3 rounded-xl"
+>
+  Primary Action
+</button>
+
+// Gradient text
+<h1 
+  className="bg-clip-text text-transparent"
+  style={{ backgroundImage: 'linear-gradient(90deg, #3d8059 0%, #5469a4 100%)' }}
+>
+  Gradient Title
+</h1>
+
+// Card with gradient background
+<div 
+  style={{ background: 'linear-gradient(90deg, rgba(76, 159, 112, 0.1) 0%, rgba(84, 105, 164, 0.1) 100%)' }}
+  className="p-6 rounded-xl"
+>
+  Card Content
+</div>
 ```
 
 ### Gradient Usage Guidelines
-- **Hero sections**: Use `bg-gradient-hero` for maximum impact
-- **Cards/Components**: Use `bg-gradient-card` for subtle depth
-- **Buttons**: Primary gradients for CTAs, success gradients for confirmations
-- **Backgrounds**: Mesh gradients for landing pages and feature showcases
+- **Hero sections**: Use hero gradient for maximum impact
+- **Cards/Components**: Use light gradients for subtle depth
+- **Buttons**: Primary/accent gradients for CTAs
+- **Text**: Gradient text for headings and important elements
+- **Always use inline styles** - custom Tailwind gradient classes don't work reliably
 
 ---
 
@@ -201,8 +229,11 @@ const cardHover = {
 
 #### Buttons
 ```jsx
-// Primary CTA button
-<button className="bg-gradient-primary text-white px-6 py-3 rounded-xl font-semibold transition-all hover:shadow-glow">
+// Primary CTA button with gradient
+<button 
+  style={{ background: 'linear-gradient(90deg, #4c9f70 0%, #3d8059 100%)' }}
+  className="text-white px-6 py-3 rounded-xl font-semibold transition-all hover:shadow-lg"
+>
   Get Started
 </button>
 
@@ -211,9 +242,12 @@ const cardHover = {
   Learn More
 </button>
 
-// AI Feature button
-<button className="bg-gradient-purple text-white px-4 py-2 rounded-lg flex items-center gap-2">
-  <AiIcon /> AI Suggest
+// Accent Feature button
+<button 
+  style={{ background: 'linear-gradient(90deg, #6279b8 0%, #5469a4 100%)' }}
+  className="text-white px-4 py-2 rounded-lg flex items-center gap-2"
+>
+  <Icon /> Feature Action
 </button>
 ```
 
@@ -233,8 +267,14 @@ const cardHover = {
 </div>
 
 // Feature highlight card
-<div className="bg-gradient-card backdrop-blur-sm rounded-2xl p-6 border border-white/20">
-  <div className="w-12 h-12 bg-gradient-primary rounded-lg flex items-center justify-center mb-4">
+<div 
+  style={{ background: 'linear-gradient(90deg, rgba(76, 159, 112, 0.1) 0%, rgba(84, 105, 164, 0.1) 100%)' }}
+  className="backdrop-blur-sm rounded-2xl p-6 border border-white/20"
+>
+  <div 
+    style={{ background: 'linear-gradient(90deg, #4c9f70 0%, #3d8059 100%)' }}
+    className="w-12 h-12 rounded-lg flex items-center justify-center mb-4"
+  >
     <Icon className="text-white" />
   </div>
   <h3 className="text-xl font-semibold mb-2">Feature Title</h3>
@@ -253,7 +293,10 @@ const cardHover = {
         <NavLink href="/features">Features</NavLink>
         <NavLink href="/pricing">Pricing</NavLink>
       </div>
-      <button className="bg-gradient-primary text-white px-4 py-2 rounded-lg">
+      <button 
+        style={{ background: 'linear-gradient(90deg, #4c9f70 0%, #3d8059 100%)' }}
+        className="text-white px-4 py-2 rounded-lg"
+      >
         Sign Up
       </button>
     </div>

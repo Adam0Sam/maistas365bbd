@@ -6,7 +6,6 @@ import { Input } from '@/components/ui/input'
 import { Search } from 'lucide-react'
 import RecipeSwiper from '@/components/RecipeSwiper'
 import LikedMeals from '@/components/LikedMeals'
-import { LikedMealsProvider } from '@/contexts/LikedMealsContext'
 import type { PlannedRecipeResult } from '@/lib/generateAndParse'
 import { 
   saveRecipesToStorage, 
@@ -352,9 +351,5 @@ function HomeContent() {
 }
 
 export default function Home() {
-  return (
-    <LikedMealsProvider>
-      <HomeContent />
-    </LikedMealsProvider>
-  )
+  return <HomeContent />
 }
