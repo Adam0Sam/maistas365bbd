@@ -5,15 +5,12 @@ import { useParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   ArrowLeft, 
-  ArrowRight, 
   Clock, 
   ChefHat, 
   CheckCircle2, 
   PlayCircle,
   PauseCircle,
   RotateCcw,
-  ChevronLeft,
-  ChevronRight,
   Timer,
   Utensils
 } from "lucide-react";
@@ -22,6 +19,14 @@ import { Badge } from "@/components/ui/badge";
 import { useLikedMeals } from "@/contexts/LikedMealsContext";
 import { FoodItem } from "@/types/food";
 import { ParsedRecipe, StepGraph, GraphTrack, GraphSimpleStep } from "@/lib/parse-full-recipe";
+import { 
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+  type CarouselApi
+} from "@/components/ui/carousel";
 
 export default function CookingStepsPage() {
   const params = useParams();
@@ -38,6 +43,7 @@ export default function CookingStepsPage() {
   const [isPaused, setIsPaused] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [carouselApi, setCarouselApi] = useState<CarouselApi>();
 
   // Load meal and recipe data
   useEffect(() => {
@@ -251,6 +257,31 @@ export default function CookingStepsPage() {
     return () => clearInterval(interval);
   }, [isPaused]);
 
+  // Sync carousel with currentStepIndex
+  useEffect(() => {
+    if (!carouselApi) return;
+    
+    carouselApi.scrollTo(currentStepIndex);
+  }, [carouselApi, currentStepIndex]);
+
+  // Listen to carousel changes and update currentStepIndex
+  useEffect(() => {
+    if (!carouselApi) return;
+
+    const handleSelect = () => {
+      const index = carouselApi.selectedScrollSnap();
+      if (index !== currentStepIndex) {
+        setCurrentStepIndex(index);
+      }
+    };
+
+    carouselApi.on("select", handleSelect);
+    
+    return () => {
+      carouselApi.off("select", handleSelect);
+    };
+  }, [carouselApi, currentStepIndex]);
+
   const getCurrentTrack = (): GraphTrack | null => {
     if (!graph || !selectedTrackId) return null;
     return graph.tracks.find(t => t.track_id === selectedTrackId) || null;
@@ -262,30 +293,7 @@ export default function CookingStepsPage() {
     return track.steps[currentStepIndex] || null;
   };
 
-  const handleStepComplete = () => {
-    const currentStep = getCurrentStep();
-    if (!currentStep) return;
 
-    setCompletedSteps(prev => new Set(prev).add(currentStep.step_id));
-    
-    const track = getCurrentTrack();
-    if (track && currentStepIndex < track.steps.length - 1) {
-      setCurrentStepIndex(currentStepIndex + 1);
-    }
-  };
-
-  const handlePreviousStep = () => {
-    if (currentStepIndex > 0) {
-      setCurrentStepIndex(currentStepIndex - 1);
-    }
-  };
-
-  const handleNextStep = () => {
-    const track = getCurrentTrack();
-    if (track && currentStepIndex < track.steps.length - 1) {
-      setCurrentStepIndex(currentStepIndex + 1);
-    }
-  };
 
   const handleTrackSelect = (trackId: string) => {
     setSelectedTrackId(trackId);
@@ -431,7 +439,7 @@ export default function CookingStepsPage() {
       {/* Main Content */}
       <div className="relative z-10 container mx-auto px-6 py-8">
         {/* Step Carousel Section */}
-        {currentTrack && currentStep && (
+        {currentTrack && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -470,167 +478,175 @@ export default function CookingStepsPage() {
                 </div>
               </div>
 
-              {/* Navigation Buttons */}
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={handlePreviousStep}
-                  disabled={currentStepIndex === 0}
-                  className="rounded-full"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={handleNextStep}
-                  disabled={currentStepIndex === currentTrack.steps.length - 1}
-                  className="rounded-full"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
+              {/* Step Counter */}
+              <div className="text-sm text-neutral-600 font-medium">
+                {currentStepIndex + 1} / {currentTrack.steps.length}
               </div>
             </div>
 
-            {/* Current Step Card */}
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={currentStep.step_id}
-                initial={{ opacity: 0, x: 50 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -50 }}
-                transition={{ duration: 0.3 }}
-                className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-xl p-8 border border-white/20"
-                style={{
-                  background: completedSteps.has(currentStep.step_id) 
-                    ? 'linear-gradient(90deg, rgba(76, 159, 112, 0.1) 0%, rgba(84, 105, 164, 0.1) 100%)'
-                    : 'rgba(255, 255, 255, 0.9)'
-                }}
-              >
-                <div className="flex items-start justify-between mb-6">
-                  <div className="flex items-center gap-4">
-                    <div 
-                      className="w-14 h-14 rounded-2xl flex items-center justify-center text-white font-bold text-xl"
-                      style={{ 
-                        background: completedSteps.has(currentStep.step_id)
-                          ? 'linear-gradient(90deg, #4c9f70 0%, #3d8059 100%)'
-                          : 'linear-gradient(90deg, #6279b8 0%, #5469a4 100%)'
+            {/* Carousel */}
+            <Carousel
+              setApi={setCarouselApi}
+              className="relative max-w-5xl mx-auto"
+              completedSteps={currentTrack.steps.map(step => completedSteps.has(step.step_id))}
+              currentStep={currentStepIndex}
+              opts={{
+                align: "center",
+                loop: false,
+              }}
+            >
+              <CarouselContent className="-ml-2 md:-ml-4">
+                {currentTrack.steps.map((step, index) => (
+                  <CarouselItem key={step.step_id} stepIndex={index} className="pl-2 md:pl-4">
+                    <motion.div
+                      className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-xl p-8 border border-white/20 h-[300px] flex flex-col"
+                      style={{
+                        background: completedSteps.has(step.step_id) 
+                          ? 'linear-gradient(90deg, rgba(76, 159, 112, 0.1) 0%, rgba(84, 105, 164, 0.1) 100%)'
+                          : 'rgba(255, 255, 255, 0.9)'
                       }}
                     >
-                      {completedSteps.has(currentStep.step_id) ? (
-                        <CheckCircle2 className="h-7 w-7" />
-                      ) : (
-                        currentStep.number
-                      )}
-                    </div>
-                    <div>
-                      <h3 className="text-xl font-semibold text-neutral-800">
-                        Step {currentStep.number}
-                      </h3>
-                      {currentStep.duration_minutes && (
-                        <div className="flex items-center gap-2 mt-1">
-                          <Timer className="h-4 w-4 text-accent-500" />
-                          <span className="text-sm text-neutral-600">
-                            {currentStep.duration_minutes} minutes
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Timer Section */}
-                  {currentStep.duration_minutes && (
-                    <div className="flex items-center gap-3">
-                      {activeTimers.has(currentStep.step_id) ? (
-                        <div className="flex items-center gap-2">
+                      <div className="flex items-start justify-between mb-6">
+                        <div className="flex items-center gap-4">
                           <div 
-                            className="text-2xl font-bold"
+                            className="w-14 h-14 rounded-2xl flex items-center justify-center text-white font-bold text-xl"
                             style={{ 
-                              color: activeTimers.get(currentStep.step_id)! <= 60 ? '#ef4444' : '#3d8059'
+                              background: completedSteps.has(step.step_id)
+                                ? 'linear-gradient(90deg, #4c9f70 0%, #3d8059 100%)'
+                                : 'linear-gradient(90deg, #6279b8 0%, #5469a4 100%)'
                             }}
                           >
-                            {formatTime(activeTimers.get(currentStep.step_id)!)}
+                            {completedSteps.has(step.step_id) ? (
+                              <CheckCircle2 className="h-7 w-7" />
+                            ) : (
+                              step.number
+                            )}
                           </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              const newTimers = new Map(activeTimers);
-                              newTimers.delete(currentStep.step_id);
-                              setActiveTimers(newTimers);
-                            }}
-                          >
-                            <RotateCcw className="h-4 w-4" />
-                          </Button>
+                          <div>
+                            <h3 className="text-xl font-semibold text-neutral-800">
+                              Step {step.number}
+                            </h3>
+                            {step.duration_minutes && (
+                              <div className="flex items-center gap-2 mt-1">
+                                <Timer className="h-4 w-4 text-accent-500" />
+                                <span className="text-sm text-neutral-600">
+                                  {step.duration_minutes} minutes
+                                </span>
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      ) : (
-                        <Button
-                          onClick={() => startTimer(currentStep.step_id, currentStep.duration_minutes!)}
-                          className="text-white"
-                          style={{ background: 'linear-gradient(90deg, #6279b8 0%, #5469a4 100%)' }}
-                        >
-                          <Timer className="h-4 w-4 mr-2" />
-                          Start Timer
-                        </Button>
-                      )}
-                    </div>
-                  )}
-                </div>
 
-                {/* Step Instruction */}
-                <div className="text-lg leading-relaxed text-neutral-700 mb-8">
-                  {currentStep.instruction}
-                </div>
-
-                {/* Action Buttons */}
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center gap-2 text-sm text-neutral-500">
-                    {completedSteps.has(currentStep.step_id) && (
-                      <div className="flex items-center gap-1 text-green-600">
-                        <CheckCircle2 className="h-4 w-4" />
-                        <span>Completed</span>
+                        {/* Timer Section */}
+                        {step.duration_minutes && (
+                          <div className="flex items-center gap-3">
+                            {activeTimers.has(step.step_id) ? (
+                              <div className="flex items-center gap-2">
+                                <div 
+                                  className="text-2xl font-bold"
+                                  style={{ 
+                                    color: activeTimers.get(step.step_id)! <= 60 ? '#ef4444' : '#3d8059'
+                                  }}
+                                >
+                                  {formatTime(activeTimers.get(step.step_id)!)}
+                                </div>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    const newTimers = new Map(activeTimers);
+                                    newTimers.delete(step.step_id);
+                                    setActiveTimers(newTimers);
+                                  }}
+                                >
+                                  <RotateCcw className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            ) : (
+                              <Button
+                                onClick={() => startTimer(step.step_id, step.duration_minutes!)}
+                                className="text-white"
+                                style={{ background: 'linear-gradient(90deg, #6279b8 0%, #5469a4 100%)' }}
+                              >
+                                <Timer className="h-4 w-4 mr-2" />
+                                Start Timer
+                              </Button>
+                            )}
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
 
-                  {!completedSteps.has(currentStep.step_id) && (
-                    <Button
-                      onClick={handleStepComplete}
-                      size="lg"
-                      className="text-white font-semibold"
-                      style={{ background: 'linear-gradient(90deg, #4c9f70 0%, #3d8059 100%)' }}
-                    >
-                      <CheckCircle2 className="h-5 w-5 mr-2" />
-                      Mark as Complete
-                    </Button>
-                  )}
-                </div>
-              </motion.div>
-            </AnimatePresence>
-
-            {/* Step Preview (next 2 steps) */}
-            {currentTrack && currentStepIndex < currentTrack.steps.length - 1 && (
-              <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-                {currentTrack.steps.slice(currentStepIndex + 1, currentStepIndex + 3).map((step, idx) => (
-                  <motion.div
-                    key={step.step_id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: idx * 0.1 }}
-                    className="bg-white/60 backdrop-blur-sm rounded-xl p-4 border border-neutral-200"
-                  >
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="w-8 h-8 rounded-lg bg-neutral-200 flex items-center justify-center text-sm font-semibold">
-                        {step.number}
+                      {/* Step Instruction */}
+                      <div className="text-lg leading-relaxed text-neutral-700 mb-8 flex-1">
+                        {step.instruction}
                       </div>
-                      <span className="text-sm text-neutral-500">Up next</span>
-                    </div>
-                    <p className="text-sm text-neutral-700 line-clamp-2">{step.instruction}</p>
-                  </motion.div>
+
+                      {/* Action Buttons */}
+                      <div className="flex justify-between items-center mt-auto">
+                        <div className="flex items-center gap-2 text-sm text-neutral-500">
+                          {completedSteps.has(step.step_id) && (
+                            <div className="flex items-center gap-1 text-green-600">
+                              <CheckCircle2 className="h-4 w-4" />
+                              <span>Completed</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {!completedSteps.has(step.step_id) && (
+                          <Button
+                            onClick={() => {
+                              setCompletedSteps(prev => new Set(prev).add(step.step_id));
+                              // Auto advance to next step if not the last one
+                              if (index < currentTrack.steps.length - 1) {
+                                setTimeout(() => {
+                                  setCurrentStepIndex(index + 1);
+                                }, 500);
+                              }
+                            }}
+                            size="lg"
+                            className="text-white font-semibold"
+                            style={{ background: 'linear-gradient(90deg, #4c9f70 0%, #3d8059 100%)' }}
+                          >
+                            <CheckCircle2 className="h-5 w-5 mr-2" />
+                            Mark as Complete
+                          </Button>
+                        )}
+                      </div>
+                    </motion.div>
+                  </CarouselItem>
                 ))}
-              </div>
-            )}
+              </CarouselContent>
+              
+              <CarouselPrevious 
+                className="left-4 bg-white/80 backdrop-blur-sm border-neutral-300 hover:bg-white hover:border-primary-400"
+                style={{ 
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)' 
+                }}
+              />
+              <CarouselNext 
+                className="right-4 bg-white/80 backdrop-blur-sm border-neutral-300 hover:bg-white hover:border-primary-400"
+                style={{ 
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)' 
+                }}
+              />
+            </Carousel>
+
+            {/* Step Indicators */}
+            <div className="flex justify-center gap-2 mt-20">
+              {currentTrack.steps.map((_, index) => (
+                <button
+                  key={index}
+                  onClick={() => setCurrentStepIndex(index)}
+                  className={`w-2 h-2 rounded-full transition-all duration-300 ${
+                    index === currentStepIndex
+                      ? 'w-8 bg-gradient-to-r from-green-500 to-green-300'
+                      : completedSteps.has(currentTrack.steps[index].step_id)
+                      ? 'bg-green-500'
+                      : 'bg-neutral-300 hover:bg-neutral-400'
+                  }`}
+                />
+              ))}
+            </div>
           </motion.div>
         )}
 
