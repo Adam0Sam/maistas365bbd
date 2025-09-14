@@ -40,6 +40,7 @@ export default function CookingStepsPage() {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [completedSteps, setCompletedSteps] = useState<Set<string>>(new Set());
   const [activeTimers, setActiveTimers] = useState<Map<string, number>>(new Map());
+  const [mealTimer, setMealTimer] = useState<number>(0); // Overall meal timer in seconds
   const [isPaused, setIsPaused] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -74,6 +75,12 @@ export default function CookingStepsPage() {
         const timersData = JSON.parse(savedTimers);
         setActiveTimers(new Map(Object.entries(timersData)));
       }
+
+      // Load meal timer
+      const savedMealTimer = localStorage.getItem(getStorageKey('mealTimer'));
+      if (savedMealTimer) {
+        setMealTimer(parseInt(savedMealTimer, 10));
+      }
     } catch (error) {
       console.warn('Failed to load cooking state from localStorage:', error);
     }
@@ -96,6 +103,12 @@ export default function CookingStepsPage() {
     if (typeof window !== 'undefined' && params?.mealId) {
       const timersObject = Object.fromEntries(timers);
       localStorage.setItem(getStorageKey('activeTimers'), JSON.stringify(timersObject));
+    }
+  };
+
+  const saveMealTimer = (time: number) => {
+    if (typeof window !== 'undefined' && params?.mealId) {
+      localStorage.setItem(getStorageKey('mealTimer'), time.toString());
     }
   };
 
@@ -171,6 +184,14 @@ export default function CookingStepsPage() {
             setRecipe(convertedRecipe);
             setGraph(foundMeal.recipeData.graph);
             setSelectedTrackId(foundMeal.recipeData.graph.tracks[0]?.track_id || "main");
+            
+            // Initialize meal timer if not already set
+            const savedMealTimer = localStorage.getItem(getStorageKey('mealTimer'));
+            if (!savedMealTimer) {
+              const initialMealTime = convertedRecipe.info.total_minutes * 60; // Convert to seconds
+              setMealTimer(initialMealTime);
+              saveMealTimer(initialMealTime);
+            }
           } else {
             // Parse the recipe into parallel tracks via API
             console.log("Steps page - Parsing recipe into parallel tracks...");
@@ -403,6 +424,14 @@ ${foundMeal.basicRecipe.instructions.map((inst, i) => `${i + 1}. ${inst}`).join(
           setRecipe(convertedRecipe);
           setGraph(basicGraph);
           setSelectedTrackId("main");
+          
+          // Initialize meal timer if not already set
+          const savedMealTimer = localStorage.getItem(getStorageKey('mealTimer'));
+          if (!savedMealTimer) {
+            const initialMealTime = convertedRecipe.info.total_minutes * 60; // Convert to seconds
+            setMealTimer(initialMealTime);
+            saveMealTimer(initialMealTime);
+          }
         }
       } else {
         // No recipe data
@@ -420,6 +449,7 @@ ${foundMeal.basicRecipe.instructions.map((inst, i) => `${i + 1}. ${inst}`).join(
     if (isPaused) return;
 
     const interval = setInterval(() => {
+      // Update step timers
       setActiveTimers(prev => {
         const newTimers = new Map(prev);
         newTimers.forEach((time, stepId) => {
@@ -428,6 +458,16 @@ ${foundMeal.basicRecipe.instructions.map((inst, i) => `${i + 1}. ${inst}`).join(
           }
         });
         return newTimers;
+      });
+
+      // Update meal timer
+      setMealTimer(prev => {
+        if (prev > 0) {
+          const newTime = prev - 1;
+          saveMealTimer(newTime);
+          return newTime;
+        }
+        return prev;
       });
     }, 1000);
 
@@ -618,6 +658,14 @@ ${foundMeal.basicRecipe.instructions.map((inst, i) => `${i + 1}. ${inst}`).join(
                   <Clock className="h-4 w-4 text-primary-500" />
                   <span>{recipe.info.total_minutes} min</span>
                 </div>
+                {mealTimer > 0 && (
+                  <div className="flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-blue-50 to-green-50 rounded-lg border border-blue-200">
+                    <Timer className="h-4 w-4 text-blue-600" />
+                    <span className="font-semibold" style={{ color: mealTimer <= 300 ? '#ef4444' : '#3d8059' }}>
+                      {formatTime(mealTimer)} remaining
+                    </span>
+                  </div>
+                )}
                 <Badge 
                   className="text-white"
                   style={{ background: 'linear-gradient(90deg, #8ea4d2 0%, #6279b8 100%)' }}
@@ -817,6 +865,23 @@ ${foundMeal.basicRecipe.instructions.map((inst, i) => `${i + 1}. ${inst}`).join(
                             onClick={() => {
                               if (stepBlocked) return; // Prevent completion if blocked
                               
+                              // Stop the timer if it's running and decrement meal timer
+                              let remainingTime = 0;
+                              if (activeTimers.has(step.step_id)) {
+                                remainingTime = activeTimers.get(step.step_id)!;
+                                const newTimers = new Map(activeTimers);
+                                newTimers.delete(step.step_id);
+                                setActiveTimers(newTimers);
+                                saveActiveTimers(newTimers);
+                                
+                                // Decrement meal timer by the remaining time
+                                setMealTimer(prev => {
+                                  const newMealTime = Math.max(0, prev - remainingTime);
+                                  saveMealTimer(newMealTime);
+                                  return newMealTime;
+                                });
+                              }
+                              
                               const newCompletedSteps = new Set(completedSteps).add(step.step_id);
                               setCompletedSteps(newCompletedSteps);
                               saveCompletedSteps(newCompletedSteps);
@@ -950,18 +1015,43 @@ ${foundMeal.basicRecipe.instructions.map((inst, i) => `${i + 1}. ${inst}`).join(
                     const stepBlocked = isStepBlocked(step);
                     
                     return (
-                    <motion.div
+                    <motion.button
                       key={step.step_id}
                       whileHover={{ scale: 1.05 }}
-                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                      title={
+                        step.duration_minutes && !completedSteps.has(step.step_id) 
+                          ? activeTimers.has(step.step_id)
+                            ? "Click to stop timer"
+                            : "Click to start timer"
+                          : undefined
+                      }
+                      onClick={() => {
+                        // If step has a timer and isn't completed
+                        if (step.duration_minutes && !completedSteps.has(step.step_id)) {
+                          if (activeTimers.has(step.step_id)) {
+                            // Stop timer
+                            const newTimers = new Map(activeTimers);
+                            newTimers.delete(step.step_id);
+                            setActiveTimers(newTimers);
+                            saveActiveTimers(newTimers);
+                          } else {
+                            // Start timer
+                            startTimer(step.step_id, step.duration_minutes);
+                          }
+                        }
+                      }}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all cursor-pointer ${
                         completedSteps.has(step.step_id)
                           ? 'bg-green-100 text-green-700 border border-green-200'
                           : stepBlocked
-                          ? 'bg-red-100 text-red-600 border border-red-200 opacity-70'
+                          ? 'bg-red-100 text-red-600 border border-red-200 opacity-70 cursor-not-allowed'
                           : selectedTrackId === track.track_id && currentStep?.step_id === step.step_id
                           ? 'bg-primary-100 text-primary-700 border border-primary-300'
-                          : 'bg-neutral-100 text-neutral-600 border border-neutral-200'
+                          : activeTimers.has(step.step_id)
+                          ? 'bg-blue-100 text-blue-700 border border-blue-300'
+                          : 'bg-neutral-100 text-neutral-600 border border-neutral-200 hover:bg-neutral-50'
                       }`}
+                      disabled={stepBlocked}
                     >
                       <div className="flex items-center gap-1">
                         {completedSteps.has(step.step_id) && (
@@ -972,12 +1062,24 @@ ${foundMeal.basicRecipe.instructions.map((inst, i) => `${i + 1}. ${inst}`).join(
                             <div className="w-1 h-1 bg-red-500 rounded-full"></div>
                           </div>
                         )}
-                        <span>Step {step.number}</span>
-                        {step.duration_minutes && (
-                          <span className="text-xs opacity-70">({step.duration_minutes}m)</span>
+                        {activeTimers.has(step.step_id) && !completedSteps.has(step.step_id) && (
+                          <Timer className="h-3 w-3 text-blue-600" />
                         )}
+                        <span>Step {step.number}</span>
+                        {step.duration_minutes && activeTimers.has(step.step_id) ? (
+                          <span 
+                            className="text-xs font-bold"
+                            style={{ 
+                              color: activeTimers.get(step.step_id)! <= 60 ? '#ef4444' : '#3d8059'
+                            }}
+                          >
+                            ({formatTime(activeTimers.get(step.step_id)!)})
+                          </span>
+                        ) : step.duration_minutes ? (
+                          <span className="text-xs opacity-70">({step.duration_minutes}m)</span>
+                        ) : null}
                       </div>
-                    </motion.div>
+                    </motion.button>
                     );
                   })}
                 </div>
