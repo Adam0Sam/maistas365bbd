@@ -141,10 +141,8 @@ export default function CookingStepsPage() {
         if ('generated' in foundMeal.recipeData && 'plan' in foundMeal.recipeData) {
           const { generated } = foundMeal.recipeData;
           
-          // For now, always use basic structure (API calls should be server-side only)
-            
-            // Fallback to basic structure
-            const convertedRecipe: ParsedRecipe = {
+          // Convert to ParsedRecipe format
+          const convertedRecipe: ParsedRecipe = {
               info: {
                 title: generated.title || foundMeal.name,
                 description: generated.description,
@@ -167,29 +165,77 @@ export default function CookingStepsPage() {
               }))
             };
 
-            const basicGraph: StepGraph = {
-              tracks: [
-                {
-                  track_id: "main",
-                  title: foundMeal.name,
-                  emoji: "🍽️",
-                  steps: generated.instructions.map((instruction, index) => ({
-                    step_id: `step_${index + 1}`,
-                    number: index + 1,
-                    instruction,
-                    duration_minutes: instruction.includes("cook") || instruction.includes("bake") || 
-                                     instruction.includes("simmer") || instruction.includes("heat") ? 
-                      Math.floor(Math.random() * 10) + 5 : undefined
-                  }))
-                }
-              ],
-              joins: [],
-              warnings: []
-            };
-
+          // Check if we have a pre-computed graph
+          if (foundMeal.recipeData.graph) {
+            console.log("Steps page - Using pre-computed graph with parallel tracks");
             setRecipe(convertedRecipe);
-            setGraph(basicGraph);
-            setSelectedTrackId("main");
+            setGraph(foundMeal.recipeData.graph);
+            setSelectedTrackId(foundMeal.recipeData.graph.tracks[0]?.track_id || "main");
+          } else {
+            // Parse the recipe into parallel tracks via API
+            console.log("Steps page - Parsing recipe into parallel tracks...");
+            try {
+              const recipeText = `${generated.title || foundMeal.name}
+
+Ingredients:
+${generated.ingredients.map(ing => `- ${ing.quantity} ${ing.name}`).join('\n')}
+
+Instructions:
+${generated.instructions.map((inst, i) => `${i + 1}. ${inst}`).join('\n')}`;
+
+              const response = await fetch('/api/recipe/parse-parallel', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  recipe: recipeText,
+                  requirements: "Parse into parallel cooking tracks for efficient cooking"
+                })
+              });
+
+              if (response.ok) {
+                const data = await response.json();
+                console.log("Steps page - Successfully parsed into tracks:", {
+                  trackCount: data.graph.tracks.length,
+                  tracks: data.graph.tracks.map(t => `${t.title} (${t.steps.length} steps)`)
+                });
+                
+                setRecipe(convertedRecipe);
+                setGraph(data.graph);
+                setSelectedTrackId(data.graph.tracks[0]?.track_id || "main");
+              } else {
+                throw new Error(`API call failed: ${response.status}`);
+              }
+            } catch (error) {
+              console.error("Steps page - Failed to parse into tracks, using fallback:", error);
+              
+              // Fallback to single track
+              const basicGraph: StepGraph = {
+                tracks: [
+                  {
+                    track_id: "main",
+                    title: foundMeal.name,
+                    emoji: "🍽️",
+                    steps: generated.instructions.map((instruction, index) => ({
+                      step_id: `step_${index + 1}`,
+                      number: index + 1,
+                      instruction,
+                      duration_minutes: instruction.includes("cook") || instruction.includes("bake") || 
+                                       instruction.includes("simmer") || instruction.includes("heat") ? 
+                        Math.floor(Math.random() * 10) + 5 : undefined
+                    }))
+                  }
+                ],
+                joins: [],
+                warnings: ["Could not parse into parallel tracks"]
+              };
+              
+              setRecipe(convertedRecipe);
+              setGraph(basicGraph);
+              setSelectedTrackId("main");
+            }
+          }
         } else if ('instructions' in foundMeal.recipeData) {
           // Handle old format where recipeData is directly the generated recipe
           const generated = foundMeal.recipeData as any;
@@ -217,28 +263,68 @@ export default function CookingStepsPage() {
             }))
           };
 
-          const basicGraph: StepGraph = {
-            tracks: [
-              {
-                track_id: "main",
-                title: foundMeal.name,
-                emoji: "🍽️",
-                steps: (generated.instructions || []).map((instruction: string, index: number) => ({
-                  step_id: `step_${index + 1}`,
-                  number: index + 1,
-                  instruction,
-                  duration_minutes: instruction.includes("cook") || instruction.includes("bake") ? 
-                    Math.floor(Math.random() * 10) + 5 : undefined
-                }))
-              }
-            ],
-            joins: [],
-            warnings: []
-          };
+          // Try to parse into parallel tracks via API
+          console.log("Steps page - Parsing old format recipe into parallel tracks...");
+          try {
+            const recipeText = `${generated.title || foundMeal.name}
 
-          setRecipe(convertedRecipe);
-          setGraph(basicGraph);
-          setSelectedTrackId("main");
+Ingredients:
+${(generated.ingredients || []).map(ing => `- ${ing.quantity || ''} ${ing.name}`).join('\n')}
+
+Instructions:
+${(generated.instructions || []).map((inst, i) => `${i + 1}. ${inst}`).join('\n')}`;
+
+            const response = await fetch('/api/recipe/parse-parallel', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                recipe: recipeText,
+                requirements: "Parse into parallel cooking tracks for efficient cooking"
+              })
+            });
+
+            if (response.ok) {
+              const data = await response.json();
+              console.log("Steps page - Successfully parsed old format into tracks:", {
+                trackCount: data.graph.tracks.length,
+                tracks: data.graph.tracks.map(t => `${t.title} (${t.steps.length} steps)`)
+              });
+              
+              setRecipe(convertedRecipe);
+              setGraph(data.graph);
+              setSelectedTrackId(data.graph.tracks[0]?.track_id || "main");
+            } else {
+              throw new Error(`API call failed: ${response.status}`);
+            }
+          } catch (error) {
+            console.error("Steps page - Failed to parse old format into tracks:", error);
+            
+            // Fallback to single track
+            const basicGraph: StepGraph = {
+              tracks: [
+                {
+                  track_id: "main",
+                  title: foundMeal.name,
+                  emoji: "🍽️",
+                  steps: (generated.instructions || []).map((instruction: string, index: number) => ({
+                    step_id: `step_${index + 1}`,
+                    number: index + 1,
+                    instruction,
+                    duration_minutes: instruction.includes("cook") || instruction.includes("bake") ? 
+                      Math.floor(Math.random() * 10) + 5 : undefined
+                  }))
+                }
+              ],
+              joins: [],
+              warnings: ["Could not parse into parallel tracks"]
+            };
+            
+            setRecipe(convertedRecipe);
+            setGraph(basicGraph);
+            setSelectedTrackId("main");
+          }
         }
       } else if (foundMeal.basicRecipe) {
         // Basic recipe data
@@ -259,28 +345,65 @@ export default function CookingStepsPage() {
           }))
         };
 
-        const basicGraph: StepGraph = {
-          tracks: [
-            {
-              track_id: "main",
-              title: foundMeal.name,
-              emoji: "🍽️",
-              steps: foundMeal.basicRecipe.instructions.map((instruction, index) => ({
-                step_id: `step_${index + 1}`,
-                number: index + 1,
-                instruction,
-                duration_minutes: instruction.includes("cook") || instruction.includes("bake") ? 
-                  Math.floor(Math.random() * 10) + 5 : undefined
-              }))
-            }
-          ],
-          joins: [],
-          warnings: []
-        };
+        // Try to parse basic recipe into parallel tracks via API
+        console.log("Steps page - Parsing basic recipe into parallel tracks...");
+        try {
+          const recipeText = `${foundMeal.basicRecipe.title || foundMeal.name}
 
-        setRecipe(convertedRecipe);
-        setGraph(basicGraph);
-        setSelectedTrackId("main");
+Instructions:
+${foundMeal.basicRecipe.instructions.map((inst, i) => `${i + 1}. ${inst}`).join('\n')}`;
+
+          const response = await fetch('/api/recipe/parse-parallel', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              recipe: recipeText,
+              requirements: "Parse into parallel cooking tracks for efficient cooking"
+            })
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            console.log("Steps page - Successfully parsed basic recipe into tracks:", {
+              trackCount: data.graph.tracks.length,
+              tracks: data.graph.tracks.map(t => `${t.title} (${t.steps.length} steps)`)
+            });
+            
+            setRecipe(convertedRecipe);
+            setGraph(data.graph);
+            setSelectedTrackId(data.graph.tracks[0]?.track_id || "main");
+          } else {
+            throw new Error(`API call failed: ${response.status}`);
+          }
+        } catch (error) {
+          console.error("Steps page - Failed to parse basic recipe into tracks:", error);
+          
+          // Fallback to single track
+          const basicGraph: StepGraph = {
+            tracks: [
+              {
+                track_id: "main",
+                title: foundMeal.name,
+                emoji: "🍽️",
+                steps: foundMeal.basicRecipe.instructions.map((instruction, index) => ({
+                  step_id: `step_${index + 1}`,
+                  number: index + 1,
+                  instruction,
+                  duration_minutes: instruction.includes("cook") || instruction.includes("bake") ? 
+                    Math.floor(Math.random() * 10) + 5 : undefined
+                }))
+              }
+            ],
+            joins: [],
+            warnings: ["Could not parse into parallel tracks"]
+          };
+
+          setRecipe(convertedRecipe);
+          setGraph(basicGraph);
+          setSelectedTrackId("main");
+        }
       } else {
         // No recipe data
         setError("No recipe data found for this meal");
@@ -347,8 +470,6 @@ export default function CookingStepsPage() {
     return track.steps[currentStepIndex] || null;
   };
 
-
-
   const handleTrackSelect = (trackId: string) => {
     setSelectedTrackId(trackId);
     setCurrentStepIndex(0);
@@ -371,6 +492,40 @@ export default function CookingStepsPage() {
     const completedCount = track.steps.filter(s => completedSteps.has(s.step_id)).length;
     return (completedCount / track.steps.length) * 100;
   };
+
+  const isStepBlocked = (step: GraphSimpleStep): boolean => {
+    if (!step.depends_on_steps || step.depends_on_steps.length === 0) {
+      return false;
+    }
+    
+    // Check if all dependent steps are completed
+    return step.depends_on_steps.some(stepId => !completedSteps.has(stepId));
+  };
+
+  const getDependentStepInfo = (step: GraphSimpleStep): { trackTitle: string; stepNumber: number } | null => {
+    if (!step.depends_on_steps || step.depends_on_steps.length === 0 || !graph) {
+      return null;
+    }
+
+    // Find the first incomplete dependency
+    for (const dependentStepId of step.depends_on_steps) {
+      if (!completedSteps.has(dependentStepId)) {
+        // Find which track and step this dependency refers to
+        for (const track of graph.tracks) {
+          const dependentStep = track.steps.find(s => s.step_id === dependentStepId);
+          if (dependentStep) {
+            return {
+              trackTitle: track.title,
+              stepNumber: dependentStep.number
+            };
+          }
+        }
+      }
+    }
+    
+    return null;
+  };
+
 
   if (isLoading || contextLoading) {
     return (
@@ -553,14 +708,21 @@ export default function CookingStepsPage() {
               }}
             >
               <CarouselContent className="-ml-2 md:-ml-4">
-                {currentTrack.steps.map((step, index) => (
+                {currentTrack.steps.map((step, index) => {
+                  const stepBlocked = isStepBlocked(step);
+                  const dependentInfo = getDependentStepInfo(step);
+                  
+                  return (
                   <CarouselItem key={step.step_id} stepIndex={index} className="pl-2 md:pl-4">
                     <motion.div
                       className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-xl p-8 border border-white/20 h-[300px] flex flex-col"
                       style={{
                         background: completedSteps.has(step.step_id) 
                           ? 'linear-gradient(90deg, rgba(76, 159, 112, 0.1) 0%, rgba(84, 105, 164, 0.1) 100%)'
-                          : 'rgba(255, 255, 255, 0.9)'
+                          : stepBlocked
+                          ? 'rgba(255, 255, 255, 0.5)'
+                          : 'rgba(255, 255, 255, 0.9)',
+                        opacity: stepBlocked ? 0.7 : 1
                       }}
                     >
                       <div className="flex items-start justify-between mb-6">
@@ -635,9 +797,23 @@ export default function CookingStepsPage() {
                       </div>
 
                       {/* Step Instruction */}
-                      <div className="text-lg leading-relaxed text-neutral-700 mb-8 flex-1">
+                      <div className="text-lg leading-relaxed text-neutral-700 mb-4 flex-1">
                         {step.instruction}
                       </div>
+
+                      {/* Dependency Warning */}
+                      {stepBlocked && dependentInfo && (
+                        <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                          <div className="flex items-center gap-2 text-amber-700">
+                            <div className="w-5 h-5 rounded-full border-2 border-amber-500 flex items-center justify-center">
+                              <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
+                            </div>
+                            <span className="text-sm font-medium">
+                              Complete {dependentInfo.trackTitle} - Step {dependentInfo.stepNumber} first
+                            </span>
+                          </div>
+                        </div>
+                      )}
 
                       {/* Action Buttons */}
                       <div className="flex justify-between items-center mt-auto">
@@ -653,6 +829,8 @@ export default function CookingStepsPage() {
                         {!completedSteps.has(step.step_id) && (
                           <Button
                             onClick={() => {
+                              if (stepBlocked) return; // Prevent completion if blocked
+                              
                               const newCompletedSteps = new Set(completedSteps).add(step.step_id);
                               setCompletedSteps(newCompletedSteps);
                               saveCompletedSteps(newCompletedSteps);
@@ -667,17 +845,23 @@ export default function CookingStepsPage() {
                               }
                             }}
                             size="lg"
-                            className="text-white font-semibold"
-                            style={{ background: 'linear-gradient(90deg, #4c9f70 0%, #3d8059 100%)' }}
+                            disabled={stepBlocked}
+                            className="text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                            style={{ 
+                              background: stepBlocked 
+                                ? 'linear-gradient(90deg, #9ca3af 0%, #6b7280 100%)'
+                                : 'linear-gradient(90deg, #4c9f70 0%, #3d8059 100%)' 
+                            }}
                           >
                             <CheckCircle2 className="h-5 w-5 mr-2" />
-                            Mark as Complete
+                            {stepBlocked ? 'Waiting for Dependencies' : 'Mark as Complete'}
                           </Button>
                         )}
                       </div>
                     </motion.div>
                   </CarouselItem>
-                ))}
+                  );
+                })}
               </CarouselContent>
               
               <CarouselPrevious 
@@ -774,13 +958,18 @@ export default function CookingStepsPage() {
 
                 {/* Step Pills */}
                 <div className="flex flex-wrap gap-2">
-                  {track.steps.map((step) => (
+                  {track.steps.map((step) => {
+                    const stepBlocked = isStepBlocked(step);
+                    
+                    return (
                     <motion.div
                       key={step.step_id}
                       whileHover={{ scale: 1.05 }}
                       className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
                         completedSteps.has(step.step_id)
                           ? 'bg-green-100 text-green-700 border border-green-200'
+                          : stepBlocked
+                          ? 'bg-red-100 text-red-600 border border-red-200 opacity-70'
                           : selectedTrackId === track.track_id && currentStep?.step_id === step.step_id
                           ? 'bg-primary-100 text-primary-700 border border-primary-300'
                           : 'bg-neutral-100 text-neutral-600 border border-neutral-200'
@@ -790,13 +979,19 @@ export default function CookingStepsPage() {
                         {completedSteps.has(step.step_id) && (
                           <CheckCircle2 className="h-3 w-3" />
                         )}
+                        {stepBlocked && !completedSteps.has(step.step_id) && (
+                          <div className="w-3 h-3 rounded-full border border-red-500 flex items-center justify-center">
+                            <div className="w-1 h-1 bg-red-500 rounded-full"></div>
+                          </div>
+                        )}
                         <span>Step {step.number}</span>
                         {step.duration_minutes && (
                           <span className="text-xs opacity-70">({step.duration_minutes}m)</span>
                         )}
                       </div>
                     </motion.div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </motion.div>
@@ -871,10 +1066,10 @@ export default function CookingStepsPage() {
                 Congratulations!
               </h2>
               <p className="text-lg text-neutral-700 mb-6">
-                You've successfully completed cooking {recipe.info.title}!
+                You&apos;ve successfully completed cooking {recipe.info.title}!
               </p>
               <Button
-                onClick={() => router.push('/liked')}
+                onClick={() => router.push('/')}
                 size="lg"
                 className="text-white font-semibold"
                 style={{ background: 'linear-gradient(90deg, #4c9f70 0%, #3d8059 100%)' }}

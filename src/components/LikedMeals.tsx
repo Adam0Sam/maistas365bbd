@@ -620,7 +620,6 @@ export default function LikedMeals({ onBack, onStartOver }: LikedMealsProps) {
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                 >
-                  <PlayCircle className="h-6 w-6 group-hover:animate-pulse" />
                   Start Cooking This Recipe
                   <ChefHat className="h-5 w-5" />
                 </motion.div>

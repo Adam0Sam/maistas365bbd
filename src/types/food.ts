@@ -1,4 +1,5 @@
 import { GeneratedRecipe } from "@/lib/generateAndParse"
+import { StepGraph } from "@/lib/parse-full-recipe"
 
 // Basic recipe info that comes from initial batch generation (without ingredients)
 export interface BasicRecipeInfo {
@@ -12,6 +13,7 @@ export interface BasicRecipeInfo {
 export interface FullRecipeData {
   generated: GeneratedRecipe
   plan: RecipePlan
+  graph?: StepGraph // Optional parallel cooking tracks
 }
 
 export interface FoodItem {

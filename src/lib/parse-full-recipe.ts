@@ -116,6 +116,7 @@ export const AnnotatedSimpleStepSchema = z.object({
    role: z.literal("simple"),
    primary_artifact_id: z.string().min(1),
    duration_minutes: z.number().int().positive().nullable().optional(),
+   depends_on_steps: z.array(z.string().min(1)).optional(), // step_ids from other tracks
 });
 
 export const AnnotatedJoinStepSchema = z.object({
@@ -156,6 +157,7 @@ export type GraphSimpleStep = {
    number: number;
    instruction: string;
    duration_minutes?: number;
+   depends_on_steps?: string[]; // step_ids from other tracks that must be completed first
 };
 
 export type GraphTrack = {
@@ -206,7 +208,8 @@ export function buildStepGraph(
             step_id: st.step_id,
             number: st.number,
             instruction: st.instruction,
-            duration_minutes: st.duration_minutes,
+            duration_minutes: st.duration_minutes || undefined,
+            depends_on_steps: st.depends_on_steps,
          });
       } else {
          // join step
@@ -271,7 +274,8 @@ export function buildStepGraph(
                step_id: s.step_id,
                number: i + 1,
                instruction: s.instruction,
-               duration_minutes: s.duration_minutes,
+               duration_minutes: s.duration_minutes || undefined,
+               depends_on_steps: s.depends_on_steps,
             })),
       };
       return {
@@ -290,18 +294,38 @@ export async function parseRecipeAnnotatedAI(input: ParseFullRecipeBody) {
       {
          role: "system",
          content: [
-            "You will structure a recipe faithfully without inventing content.",
-            "Return the standard parsed fields (info, ingredients, steps).",
-            "Additionally, create a compact annotation layer to enable parallel tracks:",
-            "- artifacts: distinct named sub-preparations (e.g., 'Sauce', 'Meat').",
-            "- annotated_steps: each original step labeled as either:",
-            "  * role = 'simple' with primary_artifact_id, or",
-            "  * role = 'join' with depends_on_artifacts (>=2 artifact ids).",
-            "Rules:",
-            "- Do NOT invent new actions; only group/label existing steps.",
-            "- Preserve original order via the 'number' field.",
-            "- If grouping is unclear, produce a single artifact 'main' and label all steps as 'simple' -> primary_artifact_id='main'.",
-            "- All artifact ids referenced by steps must exist in the artifacts list.",
+            "You will structure a recipe faithfully while breaking it down into HIGHLY GRANULAR parallel tracks.",
+            "Return the standard parsed fields (info, ingredients, steps) with DETAILED steps.",
+            "",
+            "STEP GRANULARITY REQUIREMENTS:",
+            "- Break vague steps into specific, measurable actions",
+            "- Separate prep work from cooking (e.g. 'Dice onions' vs 'Sauté diced onions')",
+            "- Make equipment setup explicit ('Heat pan over medium heat')",
+            "- Include precise timing for cooking/heating/waiting steps",
+            "- Identify multi-tasking opportunities during wait times",
+            "",
+            "PARALLEL TRACK ANNOTATIONS:",
+            "- artifacts: Create granular parallel preparations:",
+            "  * Base: protein, starch, vegetables, sauce, aromatics, marinade",
+            "  * Equipment: oven_prep, stovetop_1, stovetop_2, prep_station", 
+            "  * Process: marinating, resting, cooling, finishing",
+            "- annotated_steps: Label each step with precise timing:",
+            "  * role='simple': single-track work with primary_artifact_id + duration_minutes + depends_on_steps",
+            "  * depends_on_steps: specific step_ids from other tracks that must complete first",
+            "  * role='join': combining tracks with depends_on_artifacts",
+            "",
+            "TIMING STRATEGY:",
+            "- Every cooking/heating/waiting step gets duration_minutes",
+            "- Use natural wait times (pan heating, marinating) for other prep",
+            "- Break long processes into concurrent smaller steps",
+            "",
+            "RULES:",
+            "- Preserve recipe authenticity - only reorganize, don't invent",
+            "- Maintain logical step order within each artifact", 
+            "- Create realistic parallel workflows that save time",
+            "- If no clear parallelization exists, use single 'main' artifact",
+            "- All referenced artifact ids must exist in artifacts list",
+            "",
             "Respond in strict JSON.",
          ].join(" "),
       },

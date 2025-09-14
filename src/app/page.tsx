@@ -190,7 +190,7 @@ function HomeContent() {
             transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
             className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"
           />
-          <p className="text-lg font-medium text-muted-foreground">Loading Maistas365...</p>
+          <p className="text-lg font-medium text-muted-foreground">Loading Food360...</p>
         </motion.div>
       </div>
     )
