@@ -175,9 +175,9 @@ export class ShoppingService {
   }
 
   private createStoreInfo(name: string, chain: 'iki' | 'rimi' | 'maxima', userLocation: { lat: number; lng: number }): Store {
-    // Generate realistic coordinates near user location (within ~5km)
-    const offsetLat = (Math.random() - 0.5) * 0.09;
-    const offsetLng = (Math.random() - 0.5) * 0.09;
+    // Generate realistic coordinates near user location (within ~2km)
+    const offsetLat = (Math.random() - 0.5) * 0.02;
+    const offsetLng = (Math.random() - 0.5) * 0.02;
     const lat = userLocation.lat + offsetLat;
     const lng = userLocation.lng + offsetLng;
     const distance = Math.sqrt(offsetLat * offsetLat + offsetLng * offsetLng) * 111;
@@ -199,12 +199,12 @@ export class ShoppingService {
   }
 
   private getStoreRating(chain: 'iki' | 'rimi' | 'maxima'): number {
-    const ratings = { iki: 4.2, rimi: 4.0, maxima: 3.8 };
+    const ratings = { iki: 3.8, rimi: 4.5, maxima: 4.0 };
     return ratings[chain] + (Math.random() - 0.5) * 0.4;
   }
 
   private getStorePriceLevel(chain: 'iki' | 'rimi' | 'maxima'): 'budget' | 'moderate' | 'premium' {
-    const levels = { iki: 'premium' as const, rimi: 'moderate' as const, maxima: 'budget' as const };
+    const levels = { iki: 'budget' as const, rimi: 'premium' as const, maxima: 'moderate' as const };
     return levels[chain];
   }
 
@@ -345,9 +345,9 @@ export class ShoppingService {
 
   private getMockIngredientPrices(storeId: string, ingredients: string[]): ShoppingIngredient[] {
     const priceMultipliers: Record<string, number> = {
-      iki: 1.3,
-      rimi: 1.0,
-      maxima: 0.8,
+      iki: 0.8,
+      rimi: 1.3,
+      maxima: 1.0,
     };
 
     const chain = storeId.split('_')[0] as 'iki' | 'rimi' | 'maxima';

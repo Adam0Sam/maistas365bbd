@@ -242,11 +242,11 @@ export function StoreMap({
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.3 }}
-      className="w-full h-[400px] rounded-lg overflow-hidden shadow-lg border"
+      className="w-full h-[400px] rounded-lg overflow-hidden shadow-lg border relative"
     >
       <MapContainer
         center={[centerLat, centerLng]}
-        zoom={13}
+        zoom={14}
         className="w-full h-full"
         zoomControl={true}
       >
@@ -298,6 +298,9 @@ export function StoreMap({
           />
         ))}
       </MapContainer>
+      
+      {/* Bottom gradient overlay for visual padding */}
+      <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-white via-white/80 to-transparent pointer-events-none z-10" />
     </motion.div>
   );
 }
