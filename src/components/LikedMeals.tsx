@@ -9,6 +9,7 @@ import { FoodItem } from '@/types/food'
 import { useState, useEffect, useCallback } from 'react'
 import { getUserState, shouldShowLandingPage } from '@/lib/localStorage'
 import { useRouter } from 'next/navigation'
+import { usePrefetchParseParallel } from '@/hooks/useParseParallelQuery'
 
 // Animated Bubbles Component
 const AnimatedBubbles = () => {
@@ -338,7 +339,19 @@ export default function LikedMeals({ onBack, onStartOver }: LikedMealsProps) {
     }
   }
 
+  const prefetchParseParallel = usePrefetchParseParallel()
+  
   const handleStartCooking = (meal: FoodItem) => {
+    // Trigger parse-parallel prefetch in background immediately when user clicks "Start Cooking"
+    console.log("🚀 [LikedMeals] Starting React Query prefetch before navigation");
+    
+    // Get meal data from cache if needed
+    const mealData = mealDataCache[meal.id]
+    
+    // Prefetch the parse-parallel data
+    prefetchParseParallel(meal, mealData)
+    
+    // Navigate immediately - don't wait for prefetch to complete
     router.push(`/cook/${meal.id}?checkIngredients=true`)
   }
 

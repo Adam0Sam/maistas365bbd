@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { 
   ArrowLeft, 
   Clock, 
@@ -18,7 +18,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useLikedMeals } from "@/contexts/LikedMealsContext";
 import { FoodItem } from "@/types/food";
-import { ParsedRecipe, StepGraph, GraphTrack, GraphSimpleStep } from "@/lib/parse-full-recipe";
+import { ParsedRecipe, GraphTrack, GraphSimpleStep } from "@/lib/parse-full-recipe";
+import { useParseParallelQuery } from "@/hooks/useParseParallelQuery";
 import { 
   Carousel,
   CarouselContent,
@@ -31,26 +32,56 @@ import {
 export default function CookingStepsPage() {
   const params = useParams();
   const router = useRouter();
-  const { getLikedMealById, likedMeals, isLoading: contextLoading } = useLikedMeals();
+  const { getLikedMealById, isLoading: contextLoading } = useLikedMeals();
   
   const [meal, setMeal] = useState<FoodItem | null>(null);
   const [recipe, setRecipe] = useState<ParsedRecipe | null>(null);
-  const [graph, setGraph] = useState<StepGraph | null>(null);
   const [selectedTrackId, setSelectedTrackId] = useState<string>("");
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [completedSteps, setCompletedSteps] = useState<Set<string>>(new Set());
   const [activeTimers, setActiveTimers] = useState<Map<string, number>>(new Map());
   const [mealTimer, setMealTimer] = useState<number>(0); // Overall meal timer in seconds
   const [isPaused, setIsPaused] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [carouselApi, setCarouselApi] = useState<CarouselApi>();
+
+  // Use React Query for parse-parallel data
+  const { data: parseParallelData, isLoading: isParseLoading, error: parseError } = useParseParallelQuery(meal);
+  const isLoading = !meal || isParseLoading;
+
+  // Derive graph from React Query data
+  const graph = parseParallelData?.graph || null;
 
   // Generate storage keys based on meal ID
   const getStorageKey = React.useCallback((suffix: string) => {
     const encodedMealId = params?.mealId as string;
     return `cooking_${encodedMealId}_${suffix}`;
   }, [params?.mealId]);
+
+  // Process React Query data when it arrives
+  useEffect(() => {
+    if (parseParallelData && meal) {
+      console.log("✅ [Steps Page] Using React Query parsed data:", {
+        trackCount: parseParallelData.graph.tracks.length,
+        tracks: parseParallelData.graph.tracks.map((t: GraphTrack) => `${t.title} (${t.steps.length} steps)`)
+      });
+      
+      setSelectedTrackId(parseParallelData.graph.tracks[0]?.track_id || "main");
+      
+      // Initialize meal timer if not already set
+      const savedMealTimer = localStorage.getItem(getStorageKey('mealTimer'));
+      if (!savedMealTimer && recipe) {
+        const initialMealTime = recipe.info.total_minutes * 60; // Convert to seconds
+        setMealTimer(initialMealTime);
+        saveMealTimer(initialMealTime);
+      }
+    } else if (parseError) {
+      console.error("❌ [Steps Page] React Query parse failed:", parseError);
+      setError("Failed to parse recipe into cooking steps");
+    }
+  }, [parseParallelData, parseError, meal, recipe, getStorageKey]);
+
+  // Generate storage keys based on meal ID
 
   // Load state from localStorage
   useEffect(() => {
@@ -106,11 +137,11 @@ export default function CookingStepsPage() {
     }
   };
 
-  const saveMealTimer = (time: number) => {
+  const saveMealTimer = React.useCallback((time: number) => {
     if (typeof window !== 'undefined' && params?.mealId) {
       localStorage.setItem(getStorageKey('mealTimer'), time.toString());
     }
-  };
+  }, [getStorageKey, params?.mealId]);
 
   // Load meal and recipe data
   useEffect(() => {
@@ -120,7 +151,6 @@ export default function CookingStepsPage() {
       
       if (!mealId) {
         setError("Invalid meal ID");
-        setIsLoading(false);
         return;
       }
 
@@ -131,135 +161,59 @@ export default function CookingStepsPage() {
       }
 
       console.log("Steps page - Looking for meal ID:", mealId);
-      console.log("Steps page - All liked meals:", likedMeals);
-      console.log("Steps page - Liked meals IDs:", likedMeals.map(m => m.id));
       
       const foundMeal = getLikedMealById(mealId);
       console.log("Steps page - Found meal:", foundMeal);
       
       if (!foundMeal) {
-        // Let's also try to debug what meals are available
-        console.log("Steps page - Failed to find meal. Debugging available meals...");
-        console.log("Steps page - Searching for exact match:", mealId);
-        console.log("Steps page - Available IDs:", likedMeals.map(m => `"${m.id}"`).join(', '));
         setError(`Meal not found in your favorites. Looking for: "${mealId}"`);
-        setIsLoading(false);
         return;
       }
 
       setMeal(foundMeal);
 
-      // Extract recipe and graph data
+      // Convert meal data to ParsedRecipe format (React Query will handle parallel parsing)
       if (foundMeal.recipeData) {
         if ('generated' in foundMeal.recipeData && 'plan' in foundMeal.recipeData) {
           const { generated } = foundMeal.recipeData;
           
-          // Convert to ParsedRecipe format
           const convertedRecipe: ParsedRecipe = {
-              info: {
-                title: generated.title || foundMeal.name,
-                description: generated.description,
-                servings: generated.servings,
-                prep_minutes: generated.prep_time_minutes || 10,
-                cook_minutes: generated.cook_time_minutes || 20,
-                total_minutes: generated.total_time_minutes || 30,
-                difficulty: "medium" as const
-              },
-              ingredients: generated.ingredients.map((ing, index) => ({
-                name: ing.name,
-                quantity: ing.quantity,
-                unit: "",
-                quantity_value: 1,
-                core: index < 3
-              })),
-              steps: generated.instructions.map((instruction, index) => ({
-                instruction,
-                number: index + 1
-              }))
-            };
-
-          // Check if we have a pre-computed graph
-          if (foundMeal.recipeData.graph) {
-            console.log("Steps page - Using pre-computed graph with parallel tracks");
-            setRecipe(convertedRecipe);
-            setGraph(foundMeal.recipeData.graph);
-            setSelectedTrackId(foundMeal.recipeData.graph.tracks[0]?.track_id || "main");
-            
-            // Initialize meal timer if not already set
-            const savedMealTimer = localStorage.getItem(getStorageKey('mealTimer'));
-            if (!savedMealTimer) {
-              const initialMealTime = convertedRecipe.info.total_minutes * 60; // Convert to seconds
-              setMealTimer(initialMealTime);
-              saveMealTimer(initialMealTime);
-            }
-          } else {
-            // Parse the recipe into parallel tracks via API
-            console.log("Steps page - Parsing recipe into parallel tracks...");
-            try {
-              const recipeText = `${generated.title || foundMeal.name}
-
-Ingredients:
-${generated.ingredients.map(ing => `- ${ing.quantity} ${ing.name}`).join('\n')}
-
-Instructions:
-${generated.instructions.map((inst, i) => `${i + 1}. ${inst}`).join('\n')}`;
-
-              const response = await fetch('/api/recipe/parse-parallel', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  recipe: recipeText,
-                  requirements: "Parse into parallel cooking tracks for efficient cooking"
-                })
-              });
-
-              if (response.ok) {
-                const data = await response.json();
-                console.log("Steps page - Successfully parsed into tracks:", {
-                  trackCount: data.graph.tracks.length,
-                  tracks: data.graph.tracks.map(t => `${t.title} (${t.steps.length} steps)`)
-                });
-                
-                setRecipe(convertedRecipe);
-                setGraph(data.graph);
-                setSelectedTrackId(data.graph.tracks[0]?.track_id || "main");
-              } else {
-                throw new Error(`API call failed: ${response.status}`);
-              }
-            } catch (error) {
-              console.error("Steps page - Failed to parse into tracks, using fallback:", error);
-              
-              // Fallback to single track
-              const basicGraph: StepGraph = {
-                tracks: [
-                  {
-                    track_id: "main",
-                    title: foundMeal.name,
-                    emoji: "🍽️",
-                    steps: generated.instructions.map((instruction, index) => ({
-                      step_id: `step_${index + 1}`,
-                      number: index + 1,
-                      instruction,
-                      duration_minutes: instruction.includes("cook") || instruction.includes("bake") || 
-                                       instruction.includes("simmer") || instruction.includes("heat") ? 
-                        Math.floor(Math.random() * 10) + 5 : undefined
-                    }))
-                  }
-                ],
-                joins: [],
-                warnings: ["Could not parse into parallel tracks"]
-              };
-              
-              setRecipe(convertedRecipe);
-              setGraph(basicGraph);
-              setSelectedTrackId("main");
-            }
-          }
+            info: {
+              title: generated.title || foundMeal.name,
+              description: generated.description,
+              servings: generated.servings,
+              prep_minutes: generated.prep_time_minutes || 10,
+              cook_minutes: generated.cook_time_minutes || 20,
+              total_minutes: generated.total_time_minutes || 30,
+              difficulty: "medium" as const
+            },
+            ingredients: generated.ingredients.map((ing, index) => ({
+              name: ing.name,
+              quantity: ing.quantity,
+              unit: "",
+              quantity_value: 1,
+              core: index < 3
+            })),
+            steps: generated.instructions.map((instruction, index) => ({
+              instruction,
+              number: index + 1
+            }))
+          };
+          
+          setRecipe(convertedRecipe);
+          console.log("✅ [Steps Page] Recipe data loaded, React Query will handle parallel parsing");
         } else if ('instructions' in foundMeal.recipeData) {
           // Handle old format where recipeData is directly the generated recipe
-          const generated = foundMeal.recipeData as any;
+          const generated = foundMeal.recipeData as {
+            title?: string;
+            description?: string;
+            servings?: number;
+            prep_time_minutes?: number;
+            cook_time_minutes?: number;
+            total_time_minutes?: number;
+            ingredients?: Array<{ name: string; quantity: string }>;
+            instructions?: string[];
+          };
           
           const convertedRecipe: ParsedRecipe = {
             info: {
@@ -271,7 +225,7 @@ ${generated.instructions.map((inst, i) => `${i + 1}. ${inst}`).join('\n')}`;
               total_minutes: generated.total_time_minutes || 30,
               difficulty: "medium" as const
             },
-            ingredients: (generated.ingredients || []).map((ing: any, index: number) => ({
+            ingredients: (generated.ingredients || []).map((ing, index: number) => ({
               name: ing.name,
               quantity: ing.quantity,
               unit: "",
@@ -283,69 +237,9 @@ ${generated.instructions.map((inst, i) => `${i + 1}. ${inst}`).join('\n')}`;
               number: index + 1
             }))
           };
-
-          // Try to parse into parallel tracks via API
-          console.log("Steps page - Parsing old format recipe into parallel tracks...");
-          try {
-            const recipeText = `${generated.title || foundMeal.name}
-
-Ingredients:
-${(generated.ingredients || []).map(ing => `- ${ing.quantity || ''} ${ing.name}`).join('\n')}
-
-Instructions:
-${(generated.instructions || []).map((inst, i) => `${i + 1}. ${inst}`).join('\n')}`;
-
-            const response = await fetch('/api/recipe/parse-parallel', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                recipe: recipeText,
-                requirements: "Parse into parallel cooking tracks for efficient cooking"
-              })
-            });
-
-            if (response.ok) {
-              const data = await response.json();
-              console.log("Steps page - Successfully parsed old format into tracks:", {
-                trackCount: data.graph.tracks.length,
-                tracks: data.graph.tracks.map(t => `${t.title} (${t.steps.length} steps)`)
-              });
-              
-              setRecipe(convertedRecipe);
-              setGraph(data.graph);
-              setSelectedTrackId(data.graph.tracks[0]?.track_id || "main");
-            } else {
-              throw new Error(`API call failed: ${response.status}`);
-            }
-          } catch (error) {
-            console.error("Steps page - Failed to parse old format into tracks:", error);
-            
-            // Fallback to single track
-            const basicGraph: StepGraph = {
-              tracks: [
-                {
-                  track_id: "main",
-                  title: foundMeal.name,
-                  emoji: "🍽️",
-                  steps: (generated.instructions || []).map((instruction: string, index: number) => ({
-                    step_id: `step_${index + 1}`,
-                    number: index + 1,
-                    instruction,
-                    duration_minutes: instruction.includes("cook") || instruction.includes("bake") ? 
-                      Math.floor(Math.random() * 10) + 5 : undefined
-                  }))
-                }
-              ],
-              joins: [],
-              warnings: ["Could not parse into parallel tracks"]
-            };
-            
-            setRecipe(convertedRecipe);
-            setGraph(basicGraph);
-            setSelectedTrackId("main");
-          }
+          
+          setRecipe(convertedRecipe);
+          console.log("✅ [Steps Page] Recipe data loaded, React Query will handle parallel parsing");
         }
       } else if (foundMeal.basicRecipe) {
         // Basic recipe data
@@ -365,84 +259,18 @@ ${(generated.instructions || []).map((inst, i) => `${i + 1}. ${inst}`).join('\n'
             number: index + 1
           }))
         };
-
-        // Try to parse basic recipe into parallel tracks via API
-        console.log("Steps page - Parsing basic recipe into parallel tracks...");
-        try {
-          const recipeText = `${foundMeal.basicRecipe.title || foundMeal.name}
-
-Instructions:
-${foundMeal.basicRecipe.instructions.map((inst, i) => `${i + 1}. ${inst}`).join('\n')}`;
-
-          const response = await fetch('/api/recipe/parse-parallel', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              recipe: recipeText,
-              requirements: "Parse into parallel cooking tracks for efficient cooking"
-            })
-          });
-
-          if (response.ok) {
-            const data = await response.json();
-            console.log("Steps page - Successfully parsed basic recipe into tracks:", {
-              trackCount: data.graph.tracks.length,
-              tracks: data.graph.tracks.map(t => `${t.title} (${t.steps.length} steps)`)
-            });
-            
-            setRecipe(convertedRecipe);
-            setGraph(data.graph);
-            setSelectedTrackId(data.graph.tracks[0]?.track_id || "main");
-          } else {
-            throw new Error(`API call failed: ${response.status}`);
-          }
-        } catch (error) {
-          console.error("Steps page - Failed to parse basic recipe into tracks:", error);
-          
-          // Fallback to single track
-          const basicGraph: StepGraph = {
-            tracks: [
-              {
-                track_id: "main",
-                title: foundMeal.name,
-                emoji: "🍽️",
-                steps: foundMeal.basicRecipe.instructions.map((instruction, index) => ({
-                  step_id: `step_${index + 1}`,
-                  number: index + 1,
-                  instruction,
-                  duration_minutes: instruction.includes("cook") || instruction.includes("bake") ? 
-                    Math.floor(Math.random() * 10) + 5 : undefined
-                }))
-              }
-            ],
-            joins: [],
-            warnings: ["Could not parse into parallel tracks"]
-          };
-
-          setRecipe(convertedRecipe);
-          setGraph(basicGraph);
-          setSelectedTrackId("main");
-          
-          // Initialize meal timer if not already set
-          const savedMealTimer = localStorage.getItem(getStorageKey('mealTimer'));
-          if (!savedMealTimer) {
-            const initialMealTime = convertedRecipe.info.total_minutes * 60; // Convert to seconds
-            setMealTimer(initialMealTime);
-            saveMealTimer(initialMealTime);
-          }
-        }
+        
+        setRecipe(convertedRecipe);
+        console.log("✅ [Steps Page] Basic recipe data loaded, React Query will handle parallel parsing");
       } else {
         // No recipe data
         setError("No recipe data found for this meal");
       }
 
-      setIsLoading(false);
     };
 
     loadRecipeData();
-  }, [params?.mealId, getLikedMealById, contextLoading, likedMeals]);
+  }, [params?.mealId, getLikedMealById, contextLoading]);
 
   // Timer management
   useEffect(() => {
@@ -658,14 +486,14 @@ ${foundMeal.basicRecipe.instructions.map((inst, i) => `${i + 1}. ${inst}`).join(
                   <Clock className="h-4 w-4 text-primary-500" />
                   <span>{recipe.info.total_minutes} min</span>
                 </div>
-                {mealTimer > 0 && (
+                {/* {mealTimer > 0 && (
                   <div className="flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-blue-50 to-green-50 rounded-lg border border-blue-200">
                     <Timer className="h-4 w-4 text-blue-600" />
                     <span className="font-semibold" style={{ color: mealTimer <= 300 ? '#ef4444' : '#3d8059' }}>
                       {formatTime(mealTimer)} remaining
                     </span>
                   </div>
-                )}
+                )} */}
                 <Badge 
                   className="text-white"
                   style={{ background: 'linear-gradient(90deg, #8ea4d2 0%, #6279b8 100%)' }}

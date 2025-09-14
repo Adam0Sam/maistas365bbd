@@ -377,6 +377,10 @@ export default function CookPage() {
       return;
     }
 
+    // Note: parse-parallel is already triggered in LikedMeals component when user clicks "Start Cooking This Recipe"
+    // The parsed data should already be in localStorage by the time user reaches this point
+    console.log('📌 Parse-parallel was already triggered from LikedMeals component');
+
     const missingCount = getTotalCount() - getSelectedCount();
     console.log('Missing ingredients count:', missingCount);
     
@@ -932,10 +936,9 @@ function IngredientsModal({
                 console.log('Button clicked in IngredientsModal');
                 onStartCooking();
               }}
-              disabled={recipe.ingredients.length > 0 && selectedCount === 0}
               className="flex-1 h-12 text-white disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
               style={{ 
-                background: (recipe.ingredients.length > 0 && selectedCount === 0) ? '#94a3b8' : 'linear-gradient(90deg, #3d8059 0%, #5469a4 100%)',
+                background: 'linear-gradient(90deg, #3d8059 0%, #5469a4 100%)',
                 transition: 'background 0.3s ease'
               }}
             >
