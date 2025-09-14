@@ -339,7 +339,7 @@ export default function LikedMeals({ onBack, onStartOver }: LikedMealsProps) {
   }
 
   const handleStartCooking = (meal: FoodItem) => {
-    router.push(`/cook/${meal.id}`)
+    router.push(`/cook/${meal.id}?checkIngredients=true`)
   }
 
   const handleImportRecipe = async (e: React.FormEvent) => {

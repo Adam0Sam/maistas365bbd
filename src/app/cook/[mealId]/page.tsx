@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, ChefHat, Check, ShoppingCart, Clock, Users, Star, ChevronRight, X, CheckCircle2, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ import { setupShoppingDebug } from "@/lib/shopping-debug";
 export default function CookPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { getLikedMealById, likedMeals } = useLikedMeals();
   const [meal, setMeal] = useState<FoodItem | null>(null);
   const [recipe, setRecipe] = useState<ParsedRecipe | null>(null);
@@ -245,6 +246,14 @@ export default function CookPage() {
 
     setIsLoading(false);
   }, [params.mealId, getLikedMealById, likedMeals]);
+
+  // Auto-open ingredients modal when requested via query param
+  useEffect(() => {
+    const shouldCheckIngredients = searchParams?.get('checkIngredients') === 'true';
+    if (shouldCheckIngredients && recipe && !isLoading) {
+      setShowIngredientsModal(true);
+    }
+  }, [searchParams, recipe, isLoading]);
 
   // Check geolocation permission status
   useEffect(() => {
@@ -681,7 +690,13 @@ export default function CookPage() {
             recipe={recipe}
             selectedIngredients={selectedIngredients}
             onToggleIngredient={toggleIngredient}
-            onClose={() => setShowIngredientsModal(false)}
+            onClose={() => {
+              setShowIngredientsModal(false);
+              // If we auto-opened the modal, navigate back when closing
+              if (searchParams.get('checkIngredients') === 'true') {
+                router.back();
+              }
+            }}
             onStartCooking={handleStartCooking}
           />
         )}
