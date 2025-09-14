@@ -675,20 +675,6 @@ ${foundMeal.basicRecipe.instructions.map((inst, i) => `${i + 1}. ${inst}`).join(
               </div>
               
               {/* Progress Bar */}
-              <div className="flex-1 max-w-xs mx-8">
-                <div className="bg-neutral-200 rounded-full h-2">
-                  <motion.div
-                    className="h-full rounded-full"
-                    style={{ 
-                      background: 'linear-gradient(90deg, #4c9f70 0%, #5db382 100%)',
-                      width: `${((currentStepIndex + 1) / currentTrack.steps.length) * 100}%`
-                    }}
-                    initial={{ width: 0 }}
-                    animate={{ width: `${((currentStepIndex + 1) / currentTrack.steps.length) * 100}%` }}
-                    transition={{ duration: 0.5 }}
-                  />
-                </div>
-              </div>
 
               {/* Step Counter */}
               <div className="text-sm text-neutral-600 font-medium">
@@ -715,7 +701,7 @@ ${foundMeal.basicRecipe.instructions.map((inst, i) => `${i + 1}. ${inst}`).join(
                   return (
                   <CarouselItem key={step.step_id} stepIndex={index} className="pl-2 md:pl-4">
                     <motion.div
-                      className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-xl p-8 border border-white/20 h-[300px] flex flex-col"
+                      className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-xl p-8 border border-white/20 h-[330px] flex flex-col"
                       style={{
                         background: completedSteps.has(step.step_id) 
                           ? 'linear-gradient(90deg, rgba(76, 159, 112, 0.1) 0%, rgba(84, 105, 164, 0.1) 100%)'
@@ -878,8 +864,10 @@ ${foundMeal.basicRecipe.instructions.map((inst, i) => `${i + 1}. ${inst}`).join(
               />
             </Carousel>
 
+            
+
             {/* Step Indicators */}
-            <div className="flex justify-center gap-2 mt-20">
+            <div className="flex justify-center gap-2 mt-8">
               {currentTrack.steps.map((_, index) => (
                 <button
                   key={index}
@@ -887,7 +875,7 @@ ${foundMeal.basicRecipe.instructions.map((inst, i) => `${i + 1}. ${inst}`).join(
                     setCurrentStepIndex(index);
                     saveCurrentStep(index);
                   }}
-                  className={`w-2 h-2 rounded-full transition-all duration-300 ${
+                  className={`w-2 h-2 rounded-full transition-all duration-300 mt-16 ${
                     index === currentStepIndex
                       ? 'w-8 bg-gradient-to-r from-green-500 to-green-300'
                       : completedSteps.has(currentTrack.steps[index].step_id)
@@ -901,7 +889,7 @@ ${foundMeal.basicRecipe.instructions.map((inst, i) => `${i + 1}. ${inst}`).join(
         )}
 
         {/* GraphTracks Section */}
-        <div className="space-y-4">
+        <div className="space-y-4 mt-32">
           <h3 className="text-lg font-semibold text-neutral-800 mb-4">All Cooking Tracks</h3>
           
           {graph.tracks.map((track, trackIndex) => (
