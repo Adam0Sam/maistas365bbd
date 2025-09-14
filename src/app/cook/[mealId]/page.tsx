@@ -698,7 +698,7 @@ export default function CookPage() {
                 router.back();
               }
             }}
-            onStartCooking={  }
+            onStartCooking={handleStartCooking}
           />
         )}
       </AnimatePresence>
