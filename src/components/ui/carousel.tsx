@@ -93,9 +93,20 @@ const Carousel = React.forwardRef<
       const currentIndex = api.selectedScrollSnap()
       const nextIndex = currentIndex + 1
       
+      // Check if next step is accessible without using callback in dependency
+      let nextStepAccessible = true
+      if (nextIndex > currentStep) {
+        for (let i = 0; i < nextIndex; i++) {
+          if (!completedSteps[i]) {
+            nextStepAccessible = false
+            break
+          }
+        }
+      }
+      
       setCanScrollPrev(api.canScrollPrev())
-      setCanScrollNext(api.canScrollNext() && isStepAccessible(nextIndex))
-    }, [isStepAccessible])
+      setCanScrollNext(api.canScrollNext() && nextStepAccessible)
+    }, [completedSteps, currentStep])
 
     const scrollPrev = React.useCallback(() => {
       api?.scrollPrev()

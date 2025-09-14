@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
@@ -46,10 +46,10 @@ export default function CookingStepsPage() {
   const [carouselApi, setCarouselApi] = useState<CarouselApi>();
 
   // Generate storage keys based on meal ID
-  const getStorageKey = (suffix: string) => {
+  const getStorageKey = React.useCallback((suffix: string) => {
     const encodedMealId = params?.mealId as string;
     return `cooking_${encodedMealId}_${suffix}`;
-  };
+  }, [params?.mealId]);
 
   // Load state from localStorage
   useEffect(() => {

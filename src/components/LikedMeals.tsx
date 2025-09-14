@@ -516,14 +516,14 @@ export default function LikedMeals({ onBack, onStartOver }: LikedMealsProps) {
         </div>
 
         <div className="flex gap-2">
-          <Button 
+          {/* <Button 
             variant={showCompleted ? "default" : "outline"}
             size="sm" 
             onClick={() => setShowCompleted(!showCompleted)}
           >
             <CheckCircle2 className="h-4 w-4 mr-2" />
             {showCompleted ? "Show To Cook" : "Show Cooked"}
-          </Button>
+          </Button> */}
           <Button 
             variant="outline" 
             size="sm" 
