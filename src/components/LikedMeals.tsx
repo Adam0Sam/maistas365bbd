@@ -3,7 +3,7 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Heart, ShoppingBag, Trash2, ChefHat, Clock, Users, X, Check, CheckCircle2, PlayCircle, Plus } from 'lucide-react'
+import { ArrowLeft, Heart, ShoppingBag, Trash2, ChefHat, Clock, Users, X, Check, CheckCircle2, PlayCircle, Plus, User } from 'lucide-react'
 import { useLikedMeals } from '@/contexts/LikedMealsContext'
 import { FoodItem } from '@/types/food'
 import { useState, useEffect, useCallback } from 'react'
@@ -776,7 +776,7 @@ function GridMealCard({ meal, index, onClick, onRemove, onToggleCompleted, isCom
         y: -4,
         transition: { duration: 0.1 }
       }}
-      className="bg-card/90 backdrop-blur-md border border-border/50 rounded-xl shadow-lg hover:shadow-2xl hover:shadow-blue-100/50 cursor-pointer overflow-hidden transition-all duration-150 flex flex-col h-80 group"
+      className="bg-card/90 backdrop-blur-md border border-border/50 rounded-xl shadow-lg hover:shadow-2xl hover:shadow-blue-100/50 cursor-pointer overflow-hidden transition-all duration-150 flex flex-col h-72 group"
       onClick={onClick}
     >
       {/* Card Image */}
@@ -843,21 +843,8 @@ function GridMealCard({ meal, index, onClick, onRemove, onToggleCompleted, isCom
             </button>
           </div>
         </div>
+        <div className='text-xs text-gray-500 '>{meal.recipeData.description}</div>
         
-        {/* Category and Price Row */}
-        <div className="flex items-center justify-between gap-2 min-h-[1.5rem]">
-          <Badge variant="secondary" className="text-xs px-2 py-1 truncate flex-shrink-0" style={{ maxWidth: '5rem' }}>
-            {meal.category || 'food'}
-          </Badge>
-          {displayPrice && (
-            <div className="flex items-center gap-1 flex-shrink-0">
-              {/* <DollarSign className="h-3.5 w-3.5 text-green-600" /> */}
-              <span className="font-bold text-green-600 text-sm whitespace-nowrap">
-                {displayPrice}
-              </span>
-            </div>
-          )}
-        </div>
 
         {/* Shop Name */}
         {meal.shopName && (
@@ -879,6 +866,8 @@ function GridMealCard({ meal, index, onClick, onRemove, onToggleCompleted, isCom
             <span className="text-xs text-muted-foreground whitespace-nowrap">
               {estimatedTime}min
             </span>
+            <User className="h-3 w-3 text-muted-foreground ml-2" />
+            <span className="text-xs text-muted-foreground whitespace-nowrap>{meal.recipeData.servings}">{meal.recipeData.servings} servings</span>
           </div>
           <Heart className="h-4 w-4 text-red-500 fill-current opacity-80 flex-shrink-0" />
         </div>
