@@ -407,6 +407,7 @@ export default function CookPage() {
       console.log('Missing ingredients:', missingIngredients);
 
       const shoppingService = ShoppingService.getInstance();
+      console.log("userLocation", userLocation)
       const currentLocation = userLocation || { lat: 54.6872, lng: 25.2797 }; // Vilnius fallback
       
       console.log('Generating shopping list...');
@@ -697,7 +698,7 @@ export default function CookPage() {
                 router.back();
               }
             }}
-            onStartCooking={handleStartCooking}
+            onStartCooking={  }
           />
         )}
       </AnimatePresence>

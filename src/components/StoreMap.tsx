@@ -236,6 +236,8 @@ export function StoreMap({
 
   const centerLat = shoppingList.user_location.lat;
   const centerLng = shoppingList.user_location.lng;
+  console.log("centerLat", centerLat)
+  console.log("centerLng", centerLng)
 
   return (
     <motion.div
